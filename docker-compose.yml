@@ -1,0 +1,16 @@
+# Docker Compose file that starts a PostgreSQL database for the project
+services:
+  db:
+    image: postgres:16            # Official PostgreSQL image, version 16
+    container_name: restaurant_db # Name of the container
+    environment:
+      POSTGRES_USER: student        # Database username
+      POSTGRES_PASSWORD: student123 # Database password (for local use only)
+      POSTGRES_DB: restaurant_ml    # Database created automatically at startup
+    ports:
+      - "5432:5432"               # Expose PostgreSQL port to your computer
+    volumes:
+      - pgdata:/var/lib/postgresql/data # Keep data even if the container stops
+
+volumes:
+  pgdata:
