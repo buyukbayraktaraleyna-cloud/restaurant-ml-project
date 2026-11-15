@@ -87,3 +87,4 @@ if __name__ == "__main__":
     print("\nClass balance (0 = below 3.5, 1 = 3.5 or higher):")
     print(y.value_counts())
     print("\nMissing values in features:", int(X.isnull().sum().sum()))
+    
