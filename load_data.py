@@ -63,7 +63,7 @@ if missing_codes:
 engine = get_engine()
 with engine.begin() as conn:
     # Empty both tables first so the script can be re-run safely
-    conn.execute(text("TRUNCATE TABLE restaurants, countries"))
+    conn.execute(text("TRUNCATE TABLE restaurants, countries CASCADE"))
     countries.to_sql("countries", conn, if_exists="append", index=False)
     restaurants.to_sql(
         "restaurants",
