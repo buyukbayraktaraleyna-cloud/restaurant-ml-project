@@ -3,6 +3,7 @@ services:
   db:
     image: postgres:16            # Official PostgreSQL image, version 16
     container_name: restaurant_db # Name of the container
+    restart: unless-stopped
     environment:
       POSTGRES_USER: student        # Database username
       POSTGRES_PASSWORD: student123 # Database password (for local use only)
