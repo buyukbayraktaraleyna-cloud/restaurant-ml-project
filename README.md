@@ -57,6 +57,7 @@ restaurant-ml-project/
 ├── save_results.py          writes metrics and predictions to PostgreSQL
 ├── show_results.py          reads the results back and shows them
 ├── benchmark_index.py       index experiment (query time with and without index)
+├── run_experiments.py       cross-validation, threshold and no-votes experiments
 ├── app.py                   web panel (Flask routes)
 ├── translations.py          texts of the five languages
 └── requirements.txt
@@ -230,10 +231,46 @@ The task asks how the data structure affects processing time, so I ran a small e
 Without an index, PostgreSQL has to read every row (a sequential scan). With an index it goes straight to the matching rows. The more selective the query is, the bigger the gain: the combined filter returns very few rows and got about 100 times faster. The `aggregate_rating >= 4.8` query returns many rows, so most of its time goes to reading the rows and the gain is smaller. On the real table, which has only 9,551 rows, the difference is too small to measure, so the indexes matter more when the data grows. I tested only the relational structure and I did not compare it with a document structure such as MongoDB.
 
 To run it: `python benchmark_index.py` (Docker must be running). The numbers change a little on every run.
+## More experiments
+
+To check how reliable the results are, I ran three more experiments (`run_experiments.py`). The data is read from PostgreSQL as before and nothing is written to the database.
+
+**5-fold cross-validation.** Instead of one 80/20 split, the data is split five different ways.
+
+| Model | Accuracy | F1 |
+|---|---|---|
+| Logistic Regression | 0.834 ± 0.004 | 0.821 ± 0.004 |
+| Random Forest | 0.832 ± 0.007 | 0.821 ± 0.008 |
+
+The standard deviation is small, so the results are stable. On average the two models are almost equal. The small advantage of Logistic Regression in the single split was partly luck, but it still trains much faster.
+
+**Different thresholds for "high rated".**
+
+| Threshold | High rated | Model | Accuracy | F1 |
+|---|---|---|---|---|
+| 3.0 | 81% | Logistic Regression | 0.810 | 0.891 |
+| 3.0 | 81% | Random Forest | 0.791 | 0.875 |
+| 3.5 | 47% | Logistic Regression | 0.841 | 0.832 |
+| 3.5 | 47% | Random Forest | 0.828 | 0.822 |
+| 4.0 | 19% | Logistic Regression | 0.880 | 0.632 |
+| 4.0 | 19% | Random Forest | 0.879 | 0.634 |
+
+Accuracy can be misleading when the classes are not balanced. With a threshold of 3.0, 81% of the restaurants are "high", so always answering "high" is already 81% correct, and the models are not better than that. With 4.0 the accuracy looks high, but the F1 score drops to about 0.63. The threshold of 3.5 gives almost balanced classes and the models are clearly better than guessing, so it is a reasonable choice.
+
+**Without the vote count.** A new restaurant has no votes, so I removed `log_votes` from the features.
+
+| Model | Accuracy with votes | Accuracy without votes | F1 with votes | F1 without votes |
+|---|---|---|---|---|
+| Logistic Regression | 0.842 | 0.738 | 0.833 | 0.698 |
+| Random Forest | 0.828 | 0.734 | 0.822 | 0.706 |
+
+The accuracy drops by about 10 percentage points, so the model is clearly weaker for new restaurants. It is still better than guessing, which would be about 50% correct with these classes. In this experiment the numeric columns are scaled slightly differently, so the "with votes" numbers differ by 0.001 from the main results.
+
+To run it: `python run_experiments.py` (Docker must be running).
 
 ## Limitations and possible improvements
 
-- The number of votes is the strongest feature, but a new restaurant has no votes yet. The model would work worse for new restaurants.
+- The number of votes is the strongest feature, but a new restaurant has no votes yet. Without it the accuracy drops by about 10 points (see "More experiments").
 - The 3.5 threshold was my choice. Other thresholds, or a regression model that predicts the rating itself, could be tried.
 - The models could be improved with more features and with cross-validation.
 - This is a single-machine setup. For much more data, the database could move to a managed or distributed service and the model could be offered through an API.
