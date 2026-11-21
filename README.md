@@ -1,9 +1,11 @@
-[README.md](https://github.com/user-attachments/files/35103337/README.md)
+[README (3).md](https://github.com/user-attachments/files/35207098/README.3.md)
 # Restaurant Rating Prediction with PostgreSQL and Machine Learning
 
 This is my project for the Database Management Systems course. I used the Zomato restaurants dataset from Kaggle and built a model that predicts whether a restaurant has a high rating (3.5 or more).
 
 The goal was not only to train a model, but to make the database and the model work together. The training data is read straight from PostgreSQL with a SQL query (I never export a CSV for the model), and the predictions and metrics are written back into PostgreSQL and shown from there.
+
+I also added a small web panel (Flask, HTML, CSS and JavaScript) that shows the results from the database in a browser. It is not required by the course, I built it as an extra. It supports five languages: English, Turkish, German, Arabic and Chinese.
 
 ## Architecture
 
@@ -11,17 +13,18 @@ The goal was not only to train a model, but to make the database and the model w
 
 Everything runs on one machine. PostgreSQL runs in a Docker container and the Python scripts run locally in a virtual environment. They talk over TCP on `localhost:5432` using SQLAlchemy and psycopg2. There is no API and no cache layer. The editable diagram is in `docs/architecture_diagram.drawio` (it opens in https://app.diagrams.net).
 
-The data flow has five steps:
+The data flow has six steps:
 
 1. `load_data.py` imports the CSV and Excel files into PostgreSQL.
 2. `data_access.py` fetches the training data with a SQL `JOIN`.
 3. `preprocess.py` and `train_model.py` clean the data, train the models and test them.
 4. `save_results.py` writes the metrics and predictions back to PostgreSQL.
 5. `show_results.py` reads the results from the database and shows them.
+6. `app.py` (the web panel) reads the same tables and shows them in the browser.
 
 ## Tools
 
-PostgreSQL 16 (Docker image `postgres:16`), Python 3.13, pandas, openpyxl, SQLAlchemy, psycopg2-binary, scikit-learn and matplotlib. The exact package list is in `requirements.txt`.
+PostgreSQL 16 (Docker image `postgres:16`), Python 3.13, pandas, openpyxl, SQLAlchemy, psycopg2-binary, scikit-learn, matplotlib and Flask. The web panel is written with Jinja HTML templates, plain CSS and plain JavaScript (no frontend framework). The exact package list is in `requirements.txt`.
 
 ## Dataset
 
@@ -38,6 +41,8 @@ These files are only used once, to fill the database. After that everything read
 restaurant-ml-project/
 ├── data/                    raw dataset files (only for the first import)
 ├── docs/                    architecture diagram (PNG and draw.io)
+├── templates/               HTML pages of the web panel
+├── static/                  style.css and app.js of the web panel
 ├── outputs/                 chart created by show_results.py
 ├── sql/
 │   ├── schema.sql           countries and restaurants tables
@@ -51,6 +56,8 @@ restaurant-ml-project/
 ├── train_model.py           training and testing of both models
 ├── save_results.py          writes metrics and predictions to PostgreSQL
 ├── show_results.py          reads the results back and shows them
+├── app.py                   web panel (Flask routes)
+├── translations.py          texts of the five languages
 └── requirements.txt
 ```
 
@@ -152,7 +159,34 @@ docker exec restaurant_db psql -U student -d restaurant_ml -c "SELECT model_name
 
 The second query calculates the test accuracy again in SQL, using only the stored predictions.
 
-To start over with an empty database, run `docker compose down -v` and `docker compose up -d`, then repeat steps 4 to 8. Step 4 cannot be run again on a database that already has the `predictions` table, because that table depends on `restaurants`.
+**9. Start the web panel (optional)**
+
+```
+python app.py
+```
+
+Then open http://127.0.0.1:5000 in the browser. Docker must be running, because the panel reads everything from PostgreSQL. Press `Ctrl+C` in the terminal to stop it.
+
+To start over with an empty database, run `docker compose down -v` and `docker compose up -d`, then repeat steps 4 to 8 (and 9 if you want the panel). Step 4 cannot be run again on a database that already has the `predictions` table, because that table depends on `restaurants`.
+
+## Web panel
+
+The panel does not train anything. It only reads the tables that the scripts filled, so it shows the same numbers as `show_results.py`.
+
+Pages:
+
+- **Results**: the metrics of both models, the confusion matrices and a button to download all predictions as CSV.
+- **Statistics**: summary numbers calculated with SQL queries.
+- **Browse**: the restaurants with their predictions, with sorting and filtering in the table.
+- **Search**: search restaurants by name, with the result and the model predictions.
+- **Mistakes**: the predictions where the model was wrong, most confident first.
+
+Other details:
+
+- Language buttons EN, TR, DE, AR and ZH. The choice is saved in a cookie. Arabic is shown right to left. All texts are in `translations.py`.
+- Light and dark theme. The choice is saved in the browser.
+- The search uses bind parameters, so user input is never pasted into the SQL text. If the database is not running or a table is missing, the panel shows a short error page that says what to do.
+- Structure: the routes are in `app.py`, the HTML is in `templates/`, and the design and the small interactions are in `static/style.css` and `static/app.js`.
 
 ## From the database to the model
 
