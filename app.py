@@ -1,13 +1,27 @@
-"""Small web panel that shows the model results stored in PostgreSQL (step 13).
+"""Web panel that shows the data and the model results stored in PostgreSQL (step 13-15).
 
 Run it with:   python app.py
 Then open:     http://127.0.0.1:5000
 
+Pages:
+    /                       model metrics and confusion matrices
+    /stats                  statistics computed with SQL (ratings, countries, cuisines)
+    /restaurants            browse and filter all restaurants
+    /restaurant/<id>        details of one restaurant and the prediction of each model
+    /search                 search by name and see the predictions directly
+    /mistakes               most confident mistakes of a model
+    /export/predictions.csv download all stored predictions
+
+The HTML pages are in the templates folder, the CSS and JavaScript are in the static folder.
 The panel only reads from the database, it never changes any data.
 """
 
-from flask import Flask, request
-from jinja2 import DictLoader, Environment
+import csv
+import io
+from math import ceil
+from urllib.parse import urlencode
+
+from flask import Flask, Response, abort, render_template, request
 from sqlalchemy import text
 from sqlalchemy.exc import OperationalError, ProgrammingError
 
@@ -16,258 +30,13 @@ from db import get_engine
 app = Flask(__name__)
 engine = get_engine()
 
-
-# ---------------------------------------------------------------------------
-# HTML templates (kept in this file so the whole panel is a single script)
-# ---------------------------------------------------------------------------
-
-BASE_TEMPLATE = """<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{% block title %}{% endblock %} - Restaurant Rating Panel</title>
-<style>
-  :root {
-    color-scheme: light dark;
-    --bg: #f6f7f9; --card: #ffffff; --text: #1f2933; --muted: #667085;
-    --line: #e4e7ec; --accent: #2b6cb0; --good: #2f855a; --bad: #c53030;
-  }
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --bg: #14181d; --card: #1d232b; --text: #e6e9ee; --muted: #9aa4b2;
-      --line: #2c3541; --accent: #63a4e8; --good: #5fcf8f; --bad: #f08a8a;
-    }
-  }
-  body { margin: 0; font-family: system-ui, "Segoe UI", Arial, sans-serif;
-         background: var(--bg); color: var(--text); line-height: 1.5; }
-  header { background: var(--card); border-bottom: 1px solid var(--line); }
-  .wrap { max-width: 960px; margin: 0 auto; padding: 0 20px; }
-  nav { display: flex; gap: 20px; align-items: center; padding: 14px 0; flex-wrap: wrap; }
-  nav strong { margin-right: auto; }
-  nav a { color: var(--muted); text-decoration: none; font-weight: 600; }
-  nav a.active { color: var(--accent); }
-  main { padding: 24px 0 48px; }
-  h1 { font-size: 1.6rem; margin: 0 0 6px; }
-  h2 { font-size: 1.15rem; margin: 0 0 8px; }
-  h3 { font-size: 1rem; margin: 16px 0 6px; }
-  .sub { color: var(--muted); margin: 0 0 22px; }
-  .card { background: var(--card); border: 1px solid var(--line);
-          border-radius: 12px; padding: 18px 20px; margin-bottom: 18px; }
-  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
-           gap: 14px; margin-bottom: 18px; }
-  .stats .card { margin-bottom: 0; }
-  .num { font-size: 1.7rem; font-weight: 700; }
-  .label { color: var(--muted); font-size: .9rem; }
-  table { width: 100%; border-collapse: collapse; }
-  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line);
-           vertical-align: middle; }
-  th { color: var(--muted); font-size: .85rem; font-weight: 600; }
-  .table-scroll { overflow-x: auto; }
-  .bar { height: 6px; background: var(--line); border-radius: 3px;
-         margin-top: 4px; min-width: 70px; }
-  .bar span { display: block; height: 100%; background: var(--accent); border-radius: 3px; }
-  .matrix { max-width: 340px; }
-  .matrix th, .matrix td { text-align: center; }
-  .good { color: var(--good); font-weight: 600; }
-  .bad { color: var(--bad); font-weight: 600; }
-  .muted { color: var(--muted); }
-  .pill { display: inline-block; padding: 2px 10px; border-radius: 999px;
-          border: 1px solid var(--line); font-size: .85rem; color: var(--muted); }
-  input[type=text] { padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px;
-                     background: var(--bg); color: var(--text); width: min(420px, 100%);
-                     font-size: 1rem; }
-  button { padding: 10px 16px; border: 0; border-radius: 8px; background: #2b6cb0;
-           color: #ffffff; font-size: 1rem; cursor: pointer; }
-  .tabs a { margin-right: 16px; color: var(--accent); text-decoration: none; }
-  .tabs a.current { font-weight: 700; text-decoration: underline; }
-  code { background: var(--bg); padding: 1px 6px; border-radius: 4px; }
-</style>
-</head>
-<body>
-<header><div class="wrap"><nav>
-  <strong>Restaurant Rating Panel</strong>
-  <a href="/" class="{{ 'active' if active == 'home' }}">Results</a>
-  <a href="/search" class="{{ 'active' if active == 'search' }}">Search</a>
-  <a href="/mistakes" class="{{ 'active' if active == 'mistakes' }}">Mistakes</a>
-</nav></div></header>
-<main><div class="wrap">
-{% block content %}{% endblock %}
-</div></main>
-</body>
-</html>
-"""
-
-INDEX_TEMPLATE = """{% extends "base.html" %}
-{% block title %}Results{% endblock %}
-{% block content %}
-<h1>Model results</h1>
-<p class="sub">Everything on this page is read live from PostgreSQL.</p>
-
-<div class="stats">
-  <div class="card"><div class="num">{{ n_restaurants }}</div>
-    <div class="label">restaurants in the database</div></div>
-  <div class="card"><div class="num">{{ n_rated }}</div>
-    <div class="label">rated restaurants used by the models</div></div>
-  <div class="card"><div class="num">{{ n_predictions }}</div>
-    <div class="label">predictions stored</div></div>
-</div>
-
-{% if metrics %}
-<div class="card">
-  <h2>Test-set metrics</h2>
-  <div class="table-scroll"><table>
-    <tr><th>Model</th><th>Accuracy</th><th>Precision</th><th>Recall</th><th>F1</th>
-        <th>Training time</th></tr>
-    {% for m in metrics %}
-    <tr>
-      <td><strong>{{ m.model_name }}</strong></td>
-      {% for key in ["accuracy", "precision_score", "recall_score", "f1_score"] %}
-      <td>{{ "%.3f"|format(m[key]) }}
-        <div class="bar"><span style="width: {{ '%.1f'|format(m[key] * 100) }}%"></span></div></td>
-      {% endfor %}
-      <td>{{ "%.3f"|format(m.train_seconds) }} s</td>
-    </tr>
-    {% endfor %}
-  </table></div>
-  <p class="muted">Measured on {{ metrics[0].test_rows }} restaurants that were not used for training.</p>
-</div>
-
-<div class="card">
-  <h2>Confusion matrices</h2>
-  <p class="muted">Rows are the real class, columns are the predicted class
-    (1 means a rating of 3.5 or higher).</p>
-  {% for name, mx in matrices.items() %}
-  <h3>{{ name }}</h3>
-  <table class="matrix">
-    <tr><th></th><th>Predicted 0</th><th>Predicted 1</th></tr>
-    <tr><th>Real 0</th><td>{{ mx[0][0] }}</td><td>{{ mx[0][1] }}</td></tr>
-    <tr><th>Real 1</th><td>{{ mx[1][0] }}</td><td>{{ mx[1][1] }}</td></tr>
-  </table>
-  {% endfor %}
-</div>
-{% else %}
-<div class="card">No results found. Run <code>python save_results.py</code> first.</div>
-{% endif %}
-{% endblock %}
-"""
-
-SEARCH_TEMPLATE = """{% extends "base.html" %}
-{% block title %}Search{% endblock %}
-{% block content %}
-<h1>Search a restaurant</h1>
-<p class="sub">Type a restaurant name to see its real rating and what each model predicted.</p>
-
-<form method="get" action="/search" class="card">
-  <input type="text" name="q" value="{{ q }}" placeholder="for example: Subway" autofocus>
-  <button type="submit">Search</button>
-</form>
-
-{% if q %}
-  {% if results %}
-    <p class="muted">Found {{ results|length }} matching restaurant(s), most votes first (maximum 10).</p>
-    {% for r in results %}
-    <div class="card">
-      <h2>{{ r.restaurant_name }}</h2>
-      <p class="muted">{{ r.city }}, {{ r.country_name }} &middot; {{ r.votes }} votes</p>
-      <p>Real rating: <strong>{{ r.aggregate_rating }}</strong>
-        {% if r.aggregate_rating > 0 %}
-        <span class="pill">{{ 'high rated (3.5 or more)' if r.aggregate_rating >= 3.5 else 'below 3.5' }}</span>
-        {% endif %}
-      </p>
-      {% if r.predictions %}
-      <div class="table-scroll"><table>
-        <tr><th>Model</th><th>Prediction</th><th>Probability of a high rating</th>
-            <th>Result</th><th>Row used for</th></tr>
-        {% for p in r.predictions %}
-        <tr>
-          <td>{{ p.model_name }}</td>
-          <td>{{ 'high rated' if p.predicted_label == 1 else 'not high rated' }}</td>
-          <td>{{ "%.1f"|format(p.high_probability * 100) }}%</td>
-          <td class="{{ 'good' if p.predicted_label == p.actual_label else 'bad' }}">
-            {{ 'correct' if p.predicted_label == p.actual_label else 'wrong' }}</td>
-          <td>{{ 'test' if p.is_test_row else 'training' }}</td>
-        </tr>
-        {% endfor %}
-      </table></div>
-      <p class="muted">Rows used for "training" were seen by the model while it was learning.
-        Only "test" rows show how well the model works on restaurants it has not seen.</p>
-      {% else %}
-      <p class="muted">This restaurant has no rating yet, so the models made no prediction for it.</p>
-      {% endif %}
-    </div>
-    {% endfor %}
-  {% else %}
-    <div class="card">No restaurant found for "{{ q }}".</div>
-  {% endif %}
-{% endif %}
-{% endblock %}
-"""
-
-MISTAKES_TEMPLATE = """{% extends "base.html" %}
-{% block title %}Mistakes{% endblock %}
-{% block content %}
-<h1>Most confident mistakes</h1>
-<p class="sub">Test restaurants where the model was wrong even though it was very sure.</p>
-
-<div class="card tabs">
-  {% for name in models %}
-  <a href="/mistakes?model={{ name|urlencode }}" class="{{ 'current' if name == model }}">{{ name }}</a>
-  {% endfor %}
-</div>
-
-{% if rows %}
-<div class="card">
-  <div class="table-scroll"><table>
-    <tr><th>Restaurant</th><th>City</th><th>Real rating</th><th>Predicted</th>
-        <th>Probability of a high rating</th></tr>
-    {% for r in rows %}
-    <tr>
-      <td>{{ r.restaurant_name }}</td>
-      <td>{{ r.city }}</td>
-      <td>{{ r.aggregate_rating }}</td>
-      <td>{{ 'high rated' if r.predicted_label == 1 else 'not high rated' }}</td>
-      <td>{{ "%.1f"|format(r.high_probability * 100) }}%</td>
-    </tr>
-    {% endfor %}
-  </table></div>
-  <p class="muted">Restaurants whose real rating is close to the 3.5 threshold are the hardest to classify.</p>
-</div>
-{% else %}
-<div class="card">No mistakes to show. Run <code>python save_results.py</code> first.</div>
-{% endif %}
-{% endblock %}
-"""
-
-ERROR_TEMPLATE = """{% extends "base.html" %}
-{% block title %}Error{% endblock %}
-{% block content %}
-<h1>{{ heading }}</h1>
-<div class="card">
-  <ol>
-    {% for line in lines %}<li>{{ line }}</li>{% endfor %}
-  </ol>
-</div>
-{% endblock %}
-"""
-
-env = Environment(
-    loader=DictLoader(
-        {
-            "base.html": BASE_TEMPLATE,
-            "index.html": INDEX_TEMPLATE,
-            "search.html": SEARCH_TEMPLATE,
-            "mistakes.html": MISTAKES_TEMPLATE,
-            "error.html": ERROR_TEMPLATE,
-        }
-    ),
-    autoescape=True,  # escapes user input such as the search text
-)
+PAGE_SIZE = 20  # restaurants per page in the browse page
 
 
-def render(name, **context):
-    """Render one of the templates above."""
-    return env.get_template(name).render(**context)
+@app.context_processor
+def inject_macros():
+    """Make the small template macros (rating badge, bar) available as ui in every template."""
+    return {"ui": app.jinja_env.get_template("macros.html").module}
 
 
 def fetch_all(sql, **params):
@@ -275,6 +44,26 @@ def fetch_all(sql, **params):
     with engine.connect() as conn:
         result = conn.execute(text(sql), params)
         return [dict(row) for row in result.mappings()]
+
+
+def like_pattern(user_text):
+    """Turn the text typed by the user into a safe ILIKE pattern."""
+    escaped = user_text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    return f"%{escaped}%"
+
+
+def add_percent(rows, key, field="pct"):
+    """Add a field with the value of `key` as a percentage of the largest value."""
+    top = max((float(row[key]) for row in rows), default=0) or 1
+    for row in rows:
+        row[field] = float(row[key]) / top * 100
+
+
+def add_rating_percent(rows, key="avg_rating", field="avg_pct"):
+    """Add a field with an average rating (0 to 5) as a percentage."""
+    for row in rows:
+        value = row[key]
+        row[field] = float(value) / 5 * 100 if value is not None else 0
 
 
 # ---------------------------------------------------------------------------
@@ -318,7 +107,186 @@ def index():
         """
     )[0]
 
-    return render("index.html", active="home", metrics=metrics, matrices=matrices, **counts)
+    return render_template("index.html", active="home", metrics=metrics, matrices=matrices, **counts)
+
+
+@app.route("/stats")
+def stats():
+    """Statistics about the restaurants, calculated with SQL."""
+    # Rating distribution: restaurants grouped by the integer part of the rating
+    buckets = fetch_all(
+        """
+        SELECT FLOOR(aggregate_rating)::int AS bucket, COUNT(*) AS n
+        FROM restaurants
+        WHERE aggregate_rating > 0
+        GROUP BY FLOOR(aggregate_rating)::int
+        ORDER BY bucket
+        """
+    )
+    for row in buckets:
+        row["label"] = f"{row['bucket']}.0 to {row['bucket']}.9"
+    add_percent(buckets, "n")
+
+    unrated = fetch_all("SELECT COUNT(*) AS n FROM restaurants WHERE aggregate_rating = 0")[0]["n"]
+
+    prices = fetch_all(
+        """
+        SELECT price_range, COUNT(*) AS n,
+               ROUND(AVG(NULLIF(aggregate_rating, 0)), 2) AS avg_rating
+        FROM restaurants
+        GROUP BY price_range
+        ORDER BY price_range
+        """
+    )
+    add_rating_percent(prices)
+
+    delivery = fetch_all(
+        """
+        SELECT has_online_delivery, COUNT(*) AS n,
+               ROUND(AVG(NULLIF(aggregate_rating, 0)), 2) AS avg_rating
+        FROM restaurants
+        GROUP BY has_online_delivery
+        ORDER BY has_online_delivery DESC
+        """
+    )
+    add_rating_percent(delivery)
+
+    # The cuisines are stored as one comma-separated text, so we split them in SQL
+    cuisines = fetch_all(
+        """
+        SELECT TRIM(cuisine) AS cuisine, COUNT(*) AS n,
+               ROUND(AVG(NULLIF(r.aggregate_rating, 0)), 2) AS avg_rating
+        FROM restaurants r, regexp_split_to_table(r.cuisines, ',') AS cuisine
+        GROUP BY TRIM(cuisine)
+        ORDER BY n DESC, TRIM(cuisine)
+        LIMIT 10
+        """
+    )
+    add_percent(cuisines, "n")
+
+    countries = fetch_all(
+        """
+        SELECT c.country_name, COUNT(*) AS n,
+               ROUND(AVG(NULLIF(r.aggregate_rating, 0)), 2) AS avg_rating
+        FROM restaurants r
+        JOIN countries c ON c.country_code = r.country_code
+        GROUP BY c.country_name
+        ORDER BY n DESC, c.country_name
+        """
+    )
+    add_percent(countries, "n")
+    add_rating_percent(countries)
+
+    return render_template(
+        "stats.html",
+        active="stats",
+        buckets=buckets,
+        unrated=unrated,
+        prices=prices,
+        delivery=delivery,
+        cuisines=cuisines,
+        countries=countries,
+    )
+
+
+@app.route("/restaurants")
+def browse():
+    """List restaurants with filters and pages."""
+    f = {
+        "q": request.args.get("q", "").strip(),
+        "country": request.args.get("country", "").strip(),
+        "price": request.args.get("price", "").strip(),
+        "delivery": request.args.get("delivery", "").strip(),
+    }
+
+    # Build the WHERE part from fixed pieces, the values are bind parameters
+    conditions = []
+    params = {}
+    if f["q"]:
+        conditions.append("r.restaurant_name ILIKE :pattern")
+        params["pattern"] = like_pattern(f["q"])
+    if f["country"].isdigit():
+        conditions.append("r.country_code = :country")
+        params["country"] = int(f["country"])
+    if f["price"] in ("1", "2", "3", "4"):
+        conditions.append("r.price_range = :price")
+        params["price"] = int(f["price"])
+    if f["delivery"] == "1":
+        conditions.append("r.has_online_delivery")
+    where = "WHERE " + " AND ".join(conditions) if conditions else ""
+
+    total = fetch_all(f"SELECT COUNT(*) AS n FROM restaurants r {where}", **params)[0]["n"]
+    total_pages = max(1, ceil(total / PAGE_SIZE))
+    try:
+        page = int(request.args.get("page", "1"))
+    except ValueError:
+        page = 1
+    page = min(max(page, 1), total_pages)
+
+    rows = fetch_all(
+        f"""
+        SELECT r.restaurant_id, r.restaurant_name, r.city, c.country_name,
+               r.price_range, r.aggregate_rating, r.votes
+        FROM restaurants r
+        JOIN countries c ON c.country_code = r.country_code
+        {where}
+        ORDER BY r.votes DESC, r.restaurant_id
+        LIMIT :limit OFFSET :offset
+        """,
+        limit=PAGE_SIZE,
+        offset=(page - 1) * PAGE_SIZE,
+        **params,
+    )
+
+    countries = fetch_all("SELECT country_code, country_name FROM countries ORDER BY country_name")
+
+    def page_url(number):
+        query = {key: value for key, value in f.items() if value}
+        query["page"] = number
+        return "/restaurants?" + urlencode(query)
+
+    return render_template(
+        "browse.html",
+        active="browse",
+        f=f,
+        rows=rows,
+        total=total,
+        page=page,
+        total_pages=total_pages,
+        countries=countries,
+        prev_url=page_url(page - 1) if page > 1 else None,
+        next_url=page_url(page + 1) if page < total_pages else None,
+    )
+
+
+@app.route("/restaurant/<int:restaurant_id>")
+def restaurant_detail(restaurant_id):
+    """All details of one restaurant and the prediction of each model."""
+    rows = fetch_all(
+        """
+        SELECT r.restaurant_id, r.restaurant_name, r.city, r.address, r.locality,
+               r.cuisines, r.average_cost_for_two, r.currency, r.price_range,
+               r.has_table_booking, r.has_online_delivery, r.votes,
+               r.aggregate_rating, c.country_name
+        FROM restaurants r
+        JOIN countries c ON c.country_code = r.country_code
+        WHERE r.restaurant_id = :rid
+        """,
+        rid=restaurant_id,
+    )
+    if not rows:
+        abort(404)
+
+    predictions = fetch_all(
+        """
+        SELECT model_name, predicted_label, high_probability, actual_label, is_test_row
+        FROM predictions
+        WHERE restaurant_id = :rid
+        ORDER BY model_name
+        """,
+        rid=restaurant_id,
+    )
+    return render_template("detail.html", active="browse", r=rows[0], predictions=predictions)
 
 
 @app.route("/search")
@@ -328,8 +296,6 @@ def search():
     results = []
 
     if q:
-        # Escape the LIKE wildcards so the user text is searched literally
-        escaped = q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
         # The search text is passed as a bind parameter (protects against SQL injection)
         results = fetch_all(
             """
@@ -341,7 +307,7 @@ def search():
             ORDER BY r.votes DESC
             LIMIT 10
             """,
-            pattern=f"%{escaped}%",
+            pattern=like_pattern(q),
         )
         for restaurant in results:
             restaurant["predictions"] = fetch_all(
@@ -355,7 +321,7 @@ def search():
                 rid=restaurant["restaurant_id"],
             )
 
-    return render("search.html", active="search", q=q, results=results)
+    return render_template("search.html", active="search", q=q, results=results)
 
 
 @app.route("/mistakes")
@@ -373,7 +339,7 @@ def mistakes():
     if models:
         rows = fetch_all(
             """
-            SELECT r.restaurant_name, r.city, r.aggregate_rating,
+            SELECT r.restaurant_id, r.restaurant_name, r.city, r.aggregate_rating,
                    p.predicted_label, p.high_probability
             FROM predictions p
             JOIN restaurants r ON r.restaurant_id = p.restaurant_id
@@ -386,12 +352,51 @@ def mistakes():
             model=model,
         )
 
-    return render("mistakes.html", active="mistakes", models=models, model=model, rows=rows)
+    return render_template("mistakes.html", active="mistakes", models=models, model=model, rows=rows)
+
+
+@app.route("/export/predictions.csv")
+def export_predictions():
+    """Download all stored predictions as a CSV file."""
+    rows = fetch_all(
+        """
+        SELECT p.restaurant_id, r.restaurant_name, p.model_name, p.predicted_label,
+               p.high_probability, p.actual_label, p.is_test_row
+        FROM predictions p
+        JOIN restaurants r ON r.restaurant_id = p.restaurant_id
+        ORDER BY p.model_name, p.restaurant_id
+        """
+    )
+    buffer = io.StringIO()
+    writer = csv.writer(buffer)
+    writer.writerow(
+        ["restaurant_id", "restaurant_name", "model_name", "predicted_label",
+         "high_probability", "actual_label", "is_test_row"]
+    )
+    for row in rows:
+        writer.writerow(
+            [row["restaurant_id"], row["restaurant_name"], row["model_name"],
+             row["predicted_label"], row["high_probability"], row["actual_label"],
+             row["is_test_row"]]
+        )
+    # utf-8-sig adds a marker so Excel shows special characters correctly
+    return Response(
+        buffer.getvalue().encode("utf-8-sig"),
+        mimetype="text/csv",
+        headers={"Content-Disposition": "attachment; filename=predictions.csv"},
+    )
 
 
 # ---------------------------------------------------------------------------
 # Friendly error pages
 # ---------------------------------------------------------------------------
+
+
+@app.errorhandler(404)
+def not_found(error):
+    """Shown when a page or a restaurant does not exist."""
+    lines = ["Check the address or go back to the list of restaurants."]
+    return render_template("error.html", active="", heading="Page not found", lines=lines), 404
 
 
 @app.errorhandler(OperationalError)
@@ -402,7 +407,7 @@ def database_unreachable(error):
         "Run docker compose up -d in the project folder.",
         "Reload this page.",
     ]
-    return render("error.html", active="", heading="Cannot reach the database", lines=lines), 503
+    return render_template("error.html", active="", heading="Cannot reach the database", lines=lines), 503
 
 
 @app.errorhandler(ProgrammingError)
@@ -413,7 +418,7 @@ def table_missing(error):
         "Run python save_results.py to create and fill the results tables.",
         "Reload this page.",
     ]
-    return render("error.html", active="", heading="A table is missing", lines=lines), 500
+    return render_template("error.html", active="", heading="A table is missing", lines=lines), 500
 
 
 if __name__ == "__main__":

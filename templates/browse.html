@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}Browse{% endblock %}
+{% block content %}
+<h1>Browse restaurants</h1>
+<p class="sub">Filter the {{ total }} matching restaurants. The most voted ones come first.</p>
+
+<form method="get" action="/restaurants" class="card filters" data-autosubmit>
+  <input type="text" name="q" value="{{ f.q }}" placeholder="Restaurant name">
+  <select name="country">
+    <option value="">All countries</option>
+    {% for c in countries %}
+    <option value="{{ c.country_code }}" {{ 'selected' if f.country == c.country_code|string }}>{{ c.country_name }}</option>
+    {% endfor %}
+  </select>
+  <select name="price">
+    <option value="">Any price range</option>
+    {% for p in [1, 2, 3, 4] %}
+    <option value="{{ p }}" {{ 'selected' if f.price == p|string }}>Price range {{ p }}</option>
+    {% endfor %}
+  </select>
+  <label><input type="checkbox" name="delivery" value="1" {{ 'checked' if f.delivery }}> Online delivery</label>
+  <button type="submit">Filter</button>
+  <a class="button light" href="/restaurants">Reset</a>
+</form>
+
+{% if rows %}
+<div class="card">
+  <div class="table-scroll"><table>
+    <thead>
+      <tr><th>Restaurant</th><th>City</th><th>Country</th><th>Price</th><th>Rating</th><th>Votes</th></tr>
+    </thead>
+    <tbody>
+    {% for r in rows %}
+    <tr>
+      <td><a href="/restaurant/{{ r.restaurant_id }}">{{ r.restaurant_name }}</a></td>
+      <td>{{ r.city }}</td>
+      <td>{{ r.country_name }}</td>
+      <td>{{ r.price_range }}</td>
+      <td>{{ ui.rating(r.aggregate_rating) }}</td>
+      <td>{{ r.votes }}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+  <div class="pager">
+    {% if prev_url %}<a class="button light" href="{{ prev_url }}">&larr; Previous</a>{% endif %}
+    <span class="muted">Page {{ page }} of {{ total_pages }}</span>
+    {% if next_url %}<a class="button light" href="{{ next_url }}">Next &rarr;</a>{% endif %}
+  </div>
+</div>
+{% else %}
+<div class="card">No restaurant matches these filters.</div>
+{% endif %}
+{% endblock %}

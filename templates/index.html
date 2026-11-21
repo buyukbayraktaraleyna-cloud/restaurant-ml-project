@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}Results{% endblock %}
+{% block content %}
+<div class="hero">
+  <h1>Restaurant rating prediction</h1>
+  <p class="sub">Two models predict whether a restaurant is rated 3.5 or higher. The data, the predictions and all the numbers below are stored in and read from PostgreSQL.</p>
+</div>
+
+<div class="stats">
+  <div class="card"><div class="num">{{ n_restaurants }}</div>
+    <div class="label">restaurants in the database</div></div>
+  <div class="card"><div class="num">{{ n_rated }}</div>
+    <div class="label">rated restaurants used by the models</div></div>
+  <div class="card"><div class="num">{{ n_predictions }}</div>
+    <div class="label">predictions stored</div></div>
+</div>
+
+{% if metrics %}
+<div class="card">
+  <h2>Test-set metrics</h2>
+  <div class="table-scroll"><table class="sortable">
+    <thead>
+      <tr><th>Model</th><th>Accuracy</th><th>Precision</th><th>Recall</th><th>F1</th>
+          <th>Training time</th></tr>
+    </thead>
+    <tbody>
+    {% for m in metrics %}
+    <tr>
+      <td><strong>{{ m.model_name }}</strong></td>
+      {% for key in ["accuracy", "precision_score", "recall_score", "f1_score"] %}
+      <td>{{ "%.3f"|format(m[key]) }}{{ ui.bar(m[key] * 100) }}</td>
+      {% endfor %}
+      <td>{{ "%.3f"|format(m.train_seconds) }} s</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+  <p class="muted">Measured on {{ metrics[0].test_rows }} restaurants that were not used for training.</p>
+  <a class="button light" href="/export/predictions.csv">Download all predictions (CSV)</a>
+</div>
+
+<div class="card">
+  <h2>Confusion matrices</h2>
+  <p class="muted">Rows are the real class, columns are the predicted class
+    (1 means a rating of 3.5 or higher).</p>
+  <div class="grid2" style="gap: 0 28px">
+  {% for name, mx in matrices.items() %}
+  <div>
+    <h3>{{ name }}</h3>
+    <table class="matrix">
+      <tr><th></th><th>Predicted 0</th><th>Predicted 1</th></tr>
+      <tr><th>Real 0</th><td>{{ mx[0][0] }}</td><td>{{ mx[0][1] }}</td></tr>
+      <tr><th>Real 1</th><td>{{ mx[1][0] }}</td><td>{{ mx[1][1] }}</td></tr>
+    </table>
+  </div>
+  {% endfor %}
+  </div>
+</div>
+{% else %}
+<div class="card">No results found. Run <code>python save_results.py</code> first.</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}Error{% endblock %}
+{% block content %}
+<h1>{{ heading }}</h1>
+<div class="card">
+  <ol>
+    {% for line in lines %}<li>{{ line }}</li>{% endfor %}
+  </ol>
+</div>
+{% endblock %}
