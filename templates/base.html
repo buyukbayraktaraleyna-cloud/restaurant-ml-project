@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="en">
+<html lang="{{ lang }}" dir="{{ direction }}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{% block title %}{% endblock %} - Restaurant Rating Panel</title>
+<title>{% block title %}{% endblock %} - {{ t('app_title') }}</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%8D%BD%3C/text%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -13,17 +13,22 @@
 </head>
 <body>
 <header><div class="wrap"><nav>
-  <strong>&#127869; Restaurant Rating Panel</strong>
-  <a href="/" class="{{ 'active' if active == 'home' }}">Results</a>
-  <a href="/stats" class="{{ 'active' if active == 'stats' }}">Statistics</a>
-  <a href="/restaurants" class="{{ 'active' if active == 'browse' }}">Browse</a>
-  <a href="/search" class="{{ 'active' if active == 'search' }}">Search</a>
-  <a href="/mistakes" class="{{ 'active' if active == 'mistakes' }}">Mistakes</a>
-  <button type="button" id="theme-toggle" class="icon-button" title="Switch between light and dark theme" aria-label="Switch between light and dark theme"></button>
+  <strong>&#127869; {{ t('app_title') }}</strong>
+  <a href="/" class="{{ 'active' if active == 'home' }}">{{ t('nav_results') }}</a>
+  <a href="/stats" class="{{ 'active' if active == 'stats' }}">{{ t('nav_stats') }}</a>
+  <a href="/restaurants" class="{{ 'active' if active == 'browse' }}">{{ t('nav_browse') }}</a>
+  <a href="/search" class="{{ 'active' if active == 'search' }}">{{ t('nav_search') }}</a>
+  <a href="/mistakes" class="{{ 'active' if active == 'mistakes' }}">{{ t('nav_mistakes') }}</a>
+  <span class="lang-switch" title="{{ t('language') }}">
+    {% for code, name in languages.items() %}
+    <a href="/lang/{{ code }}?next={{ current_url|urlencode }}" class="{{ 'current' if code == lang }}" title="{{ name }}">{{ code|upper }}</a>
+    {% endfor %}
+  </span>
+  <button type="button" id="theme-toggle" class="icon-button" title="{{ t('theme_title') }}" aria-label="{{ t('theme_title') }}"></button>
 </nav></div></header>
 <main><div class="wrap">
 {% block content %}{% endblock %}
 </div></main>
-<footer><div class="wrap">Data: Zomato Restaurants (Kaggle). Everything on this site is read live from PostgreSQL.</div></footer>
+<footer><div class="wrap">{{ t('footer') }}</div></footer>
 </body>
 </html>

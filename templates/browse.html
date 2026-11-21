@@ -1,33 +1,34 @@
 {% extends "base.html" %}
-{% block title %}Browse{% endblock %}
+{% block title %}{{ t('browse_title') }}{% endblock %}
 {% block content %}
-<h1>Browse restaurants</h1>
-<p class="sub">Filter the {{ total }} matching restaurants. The most voted ones come first.</p>
+<h1>{{ t('browse_title') }}</h1>
+<p class="sub">{{ t('browse_sub', total=total) }}</p>
 
 <form method="get" action="/restaurants" class="card filters" data-autosubmit>
-  <input type="text" name="q" value="{{ f.q }}" placeholder="Restaurant name">
+  <input type="text" name="q" value="{{ f.q }}" placeholder="{{ t('ph_name') }}">
   <select name="country">
-    <option value="">All countries</option>
+    <option value="">{{ t('all_countries') }}</option>
     {% for c in countries %}
     <option value="{{ c.country_code }}" {{ 'selected' if f.country == c.country_code|string }}>{{ c.country_name }}</option>
     {% endfor %}
   </select>
   <select name="price">
-    <option value="">Any price range</option>
+    <option value="">{{ t('any_price') }}</option>
     {% for p in [1, 2, 3, 4] %}
-    <option value="{{ p }}" {{ 'selected' if f.price == p|string }}>Price range {{ p }}</option>
+    <option value="{{ p }}" {{ 'selected' if f.price == p|string }}>{{ t('price_option', n=p) }}</option>
     {% endfor %}
   </select>
-  <label><input type="checkbox" name="delivery" value="1" {{ 'checked' if f.delivery }}> Online delivery</label>
-  <button type="submit">Filter</button>
-  <a class="button light" href="/restaurants">Reset</a>
+  <label><input type="checkbox" name="delivery" value="1" {{ 'checked' if f.delivery }}> {{ t('online_delivery') }}</label>
+  <button type="submit">{{ t('filter_button') }}</button>
+  <a class="button light" href="/restaurants">{{ t('reset_button') }}</a>
 </form>
 
 {% if rows %}
 <div class="card">
   <div class="table-scroll"><table>
     <thead>
-      <tr><th>Restaurant</th><th>City</th><th>Country</th><th>Price</th><th>Rating</th><th>Votes</th></tr>
+      <tr><th>{{ t('col_restaurant') }}</th><th>{{ t('col_city') }}</th><th>{{ t('col_country') }}</th>
+          <th>{{ t('col_price') }}</th><th>{{ t('col_rating') }}</th><th>{{ t('col_votes') }}</th></tr>
     </thead>
     <tbody>
     {% for r in rows %}
@@ -43,12 +44,12 @@
     </tbody>
   </table></div>
   <div class="pager">
-    {% if prev_url %}<a class="button light" href="{{ prev_url }}">&larr; Previous</a>{% endif %}
-    <span class="muted">Page {{ page }} of {{ total_pages }}</span>
-    {% if next_url %}<a class="button light" href="{{ next_url }}">Next &rarr;</a>{% endif %}
+    {% if prev_url %}<a class="button light" href="{{ prev_url }}">{{ '→' if rtl else '←' }} {{ t('previous') }}</a>{% endif %}
+    <span class="muted">{{ t('page_of', page=page, total=total_pages) }}</span>
+    {% if next_url %}<a class="button light" href="{{ next_url }}">{{ t('next') }} {{ '←' if rtl else '→' }}</a>{% endif %}
   </div>
 </div>
 {% else %}
-<div class="card">No restaurant matches these filters.</div>
+<div class="card">{{ t('no_match') }}</div>
 {% endif %}
 {% endblock %}

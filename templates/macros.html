@@ -1,6 +1,6 @@
 {% macro rating(value) -%}
   {% if value is none or value == 0 -%}
-    <span class="pill">not rated</span>
+    <span class="pill">{{ t('not_rated') }}</span>
   {%- elif value >= 3.5 -%}
     <span class="pill good">{{ value }}</span>
   {%- else -%}

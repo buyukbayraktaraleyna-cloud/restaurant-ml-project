@@ -54,6 +54,16 @@
   // ---------------------------------------------------------------------
   // 2. Sortable tables: <table class="sortable"> with a <thead> and a <tbody>
   // ---------------------------------------------------------------------
+  // The hint that is shown when the mouse is over a column title
+  var SORT_HINT = {
+    en: "Click to sort",
+    tr: "S\u0131ralamak i\u00e7in t\u0131klay\u0131n",
+    de: "Zum Sortieren klicken",
+    ar: "\u0627\u0646\u0642\u0631 \u0644\u0644\u0641\u0631\u0632",
+    zh: "\u70b9\u51fb\u6392\u5e8f"
+  };
+  var pageLanguage = (root.getAttribute("lang") || "en").slice(0, 2);
+
   var NUMBER_PATTERN = /^-?\d+(\.\d+)?\s*(%|s)?$/;
 
   function readCell(cell) {
@@ -99,7 +109,7 @@
       var headers = table.tHead.rows[0].cells;
       Array.prototype.forEach.call(headers, function (header, column) {
         header.setAttribute("data-sortable", "true");
-        header.setAttribute("title", "Click to sort");
+        header.setAttribute("title", SORT_HINT[pageLanguage] || SORT_HINT.en);
         header.addEventListener("click", function () {
           var ascending = header.getAttribute("data-sort") !== "asc";
           Array.prototype.forEach.call(headers, function (other) {

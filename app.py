@@ -1,4 +1,4 @@
-"""Web panel that shows the data and the model results stored in PostgreSQL (step 13-15).
+"""Web panel that shows the data and the model results stored in PostgreSQL (step 13-16).
 
 Run it with:   python app.py
 Then open:     http://127.0.0.1:5000
@@ -11,6 +11,7 @@ Pages:
     /search                 search by name and see the predictions directly
     /mistakes               most confident mistakes of a model
     /export/predictions.csv download all stored predictions
+    /lang/<code>            choose the language (en, tr, de, ar, zh)
 
 The HTML pages are in the templates folder, the CSS and JavaScript are in the static folder.
 The panel only reads from the database, it never changes any data.
@@ -21,11 +22,12 @@ import io
 from math import ceil
 from urllib.parse import urlencode
 
-from flask import Flask, Response, abort, render_template, request
+from flask import Flask, Response, abort, redirect, render_template, request
 from sqlalchemy import text
 from sqlalchemy.exc import OperationalError, ProgrammingError
 
 from db import get_engine
+from translations import DEFAULT_LANGUAGE, LANGUAGES, RTL_LANGUAGES, translate
 
 app = Flask(__name__)
 engine = get_engine()
@@ -33,10 +35,35 @@ engine = get_engine()
 PAGE_SIZE = 20  # restaurants per page in the browse page
 
 
+def current_language():
+    """Language chosen by the visitor (stored in a cookie), English if nothing was chosen."""
+    code = request.cookies.get("lang", DEFAULT_LANGUAGE)
+    return code if code in LANGUAGES else DEFAULT_LANGUAGE
+
+
+def t(key, **params):
+    """Return the text with this key in the current language."""
+    return translate(key, current_language(), **params)
+
+
+# t() can be used in every template and in every macro
+app.jinja_env.globals["t"] = t
+
+
 @app.context_processor
-def inject_macros():
-    """Make the small template macros (rating badge, bar) available as ui in every template."""
-    return {"ui": app.jinja_env.get_template("macros.html").module}
+def inject_template_helpers():
+    """Variables that every template can use."""
+    language = current_language()
+    return {
+        # the small template macros (rating badge, bar) are available as ui
+        "ui": app.jinja_env.get_template("macros.html").module,
+        "lang": language,
+        "languages": LANGUAGES,
+        "rtl": language in RTL_LANGUAGES,
+        "direction": "rtl" if language in RTL_LANGUAGES else "ltr",
+        # the address of the current page, used by the language links to come back here
+        "current_url": request.full_path.rstrip("?"),
+    }
 
 
 def fetch_all(sql, **params):
@@ -124,7 +151,7 @@ def stats():
         """
     )
     for row in buckets:
-        row["label"] = f"{row['bucket']}.0 to {row['bucket']}.9"
+        row["label"] = f"{row['bucket']}.0 - {row['bucket']}.9"
     add_percent(buckets, "n")
 
     unrated = fetch_all("SELECT COUNT(*) AS n FROM restaurants WHERE aggregate_rating = 0")[0]["n"]
@@ -355,6 +382,20 @@ def mistakes():
     return render_template("mistakes.html", active="mistakes", models=models, model=model, rows=rows)
 
 
+@app.route("/lang/<code>")
+def set_language(code):
+    """Remember the chosen language in a cookie and go back to the page the visitor came from."""
+    if code not in LANGUAGES:
+        abort(404)
+    target = request.args.get("next", "/")
+    # only allow addresses inside this site (no redirect to other websites)
+    if not target.startswith("/") or target.startswith("//") or "\\" in target:
+        target = "/"
+    response = redirect(target)
+    response.set_cookie("lang", code, max_age=60 * 60 * 24 * 365, samesite="Lax")
+    return response
+
+
 @app.route("/export/predictions.csv")
 def export_predictions():
     """Download all stored predictions as a CSV file."""
@@ -395,30 +436,24 @@ def export_predictions():
 @app.errorhandler(404)
 def not_found(error):
     """Shown when a page or a restaurant does not exist."""
-    lines = ["Check the address or go back to the list of restaurants."]
-    return render_template("error.html", active="", heading="Page not found", lines=lines), 404
+    return (
+        render_template("error.html", active="", heading=t("err_404_heading"), lines=[t("err_404_line")]),
+        404,
+    )
 
 
 @app.errorhandler(OperationalError)
 def database_unreachable(error):
     """Shown when PostgreSQL is not running (for example Docker is closed)."""
-    lines = [
-        "Open Docker Desktop and wait until the engine is running.",
-        "Run docker compose up -d in the project folder.",
-        "Reload this page.",
-    ]
-    return render_template("error.html", active="", heading="Cannot reach the database", lines=lines), 503
+    lines = [t("err_db_1"), t("err_db_2"), t("err_reload")]
+    return render_template("error.html", active="", heading=t("err_db_heading"), lines=lines), 503
 
 
 @app.errorhandler(ProgrammingError)
 def table_missing(error):
     """Shown when a table does not exist yet."""
-    lines = [
-        "Run python load_data.py to fill the restaurants and countries tables.",
-        "Run python save_results.py to create and fill the results tables.",
-        "Reload this page.",
-    ]
-    return render_template("error.html", active="", heading="A table is missing", lines=lines), 500
+    lines = [t("err_table_1"), t("err_table_2"), t("err_reload")]
+    return render_template("error.html", active="", heading=t("err_table_heading"), lines=lines), 500
 
 
 if __name__ == "__main__":

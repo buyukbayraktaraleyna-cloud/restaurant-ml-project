@@ -1,29 +1,27 @@
 {% extends "base.html" %}
-{% block title %}Statistics{% endblock %}
+{% block title %}{{ t('stats_title') }}{% endblock %}
 {% block content %}
-<h1>Statistics</h1>
-<p class="sub">Every number here is calculated by a SQL query when you open the page.
-  Restaurants with a rating of 0 have not been rated yet, so they are left out of the averages.
-  Click a column title to sort a table.</p>
+<h1>{{ t('stats_title') }}</h1>
+<p class="sub">{{ t('stats_sub') }}</p>
 
 <div class="grid2">
   <div class="card">
-    <h2>Rating distribution</h2>
+    <h2>{{ t('rating_distribution') }}</h2>
     <table>
-      <thead><tr><th>Rating</th><th>Restaurants</th></tr></thead>
+      <thead><tr><th>{{ t('col_rating') }}</th><th>{{ t('col_restaurants') }}</th></tr></thead>
       <tbody>
       {% for b in buckets %}
       <tr><td>{{ b.label }}</td><td>{{ b.n }}{{ ui.bar(b.pct) }}</td></tr>
       {% endfor %}
       </tbody>
     </table>
-    <p class="muted">{{ unrated }} restaurants are not rated yet.</p>
+    <p class="muted">{{ t('unrated_note', n=unrated) }}</p>
   </div>
 
   <div class="card">
-    <h2>Average rating by price range</h2>
+    <h2>{{ t('price_title') }}</h2>
     <table class="sortable">
-      <thead><tr><th>Price range</th><th>Restaurants</th><th>Average rating</th></tr></thead>
+      <thead><tr><th>{{ t('price_range') }}</th><th>{{ t('col_restaurants') }}</th><th>{{ t('col_avg_rating') }}</th></tr></thead>
       <tbody>
       {% for p in prices %}
       <tr><td>{{ p.price_range }}</td><td>{{ p.n }}</td>
@@ -31,16 +29,16 @@
       {% endfor %}
       </tbody>
     </table>
-    <p class="muted">1 is the cheapest and 4 is the most expensive.</p>
+    <p class="muted">{{ t('price_note') }}</p>
   </div>
 
   <div class="card">
-    <h2>Online delivery</h2>
+    <h2>{{ t('delivery_title') }}</h2>
     <table>
-      <thead><tr><th>Online delivery</th><th>Restaurants</th><th>Average rating</th></tr></thead>
+      <thead><tr><th>{{ t('online_delivery') }}</th><th>{{ t('col_restaurants') }}</th><th>{{ t('col_avg_rating') }}</th></tr></thead>
       <tbody>
       {% for d in delivery %}
-      <tr><td>{{ 'Yes' if d.has_online_delivery else 'No' }}</td><td>{{ d.n }}</td>
+      <tr><td>{{ t('yes') if d.has_online_delivery else t('no') }}</td><td>{{ d.n }}</td>
         <td>{{ d.avg_rating if d.avg_rating is not none else '-' }}{{ ui.bar(d.avg_pct) }}</td></tr>
       {% endfor %}
       </tbody>
@@ -48,9 +46,9 @@
   </div>
 
   <div class="card">
-    <h2>Top 10 cuisines</h2>
+    <h2>{{ t('cuisines_title') }}</h2>
     <table class="sortable">
-      <thead><tr><th>Cuisine</th><th>Restaurants</th><th>Average rating</th></tr></thead>
+      <thead><tr><th>{{ t('col_cuisine') }}</th><th>{{ t('col_restaurants') }}</th><th>{{ t('col_avg_rating') }}</th></tr></thead>
       <tbody>
       {% for c in cuisines %}
       <tr><td>{{ c.cuisine }}</td><td>{{ c.n }}{{ ui.bar(c.pct) }}</td>
@@ -58,16 +56,16 @@
       {% endfor %}
       </tbody>
     </table>
-    <p class="muted">A restaurant can serve several cuisines, so it is counted once for each of them.</p>
+    <p class="muted">{{ t('cuisines_note') }}</p>
   </div>
 </div>
 
 <div class="card" style="margin-top: 18px">
-  <h2>Restaurants per country</h2>
+  <h2>{{ t('countries_title') }}</h2>
   <input type="text" class="table-filter" data-filter-table="#country-table"
-         placeholder="Type to filter the countries">
+         placeholder="{{ t('filter_countries') }}">
   <div class="table-scroll"><table id="country-table" class="sortable">
-    <thead><tr><th>Country</th><th>Restaurants</th><th>Average rating</th></tr></thead>
+    <thead><tr><th>{{ t('col_country') }}</th><th>{{ t('col_restaurants') }}</th><th>{{ t('col_avg_rating') }}</th></tr></thead>
     <tbody>
     {% for c in countries %}
     <tr><td>{{ c.country_name }}</td><td>{{ c.n }}{{ ui.bar(c.pct) }}</td>

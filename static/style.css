@@ -50,7 +50,7 @@ header { background: var(--card); border-bottom: 1px solid var(--line);
          transition: background-color .25s, border-color .25s; }
 .wrap { max-width: 1040px; margin: 0 auto; padding: 0 22px; }
 nav { display: flex; gap: 6px; align-items: center; padding: 10px 0; flex-wrap: wrap; }
-nav strong { margin-right: auto; font-family: var(--font-heading); font-size: 1.1rem;
+nav strong { margin-inline-end: auto; font-family: var(--font-heading); font-size: 1.1rem;
              letter-spacing: -.01em; }
 nav a { color: var(--muted); text-decoration: none; font-weight: 600; font-size: .95rem;
         padding: 6px 12px; border-radius: 8px; transition: background-color .15s, color .15s; }
@@ -88,7 +88,7 @@ h3 { font-size: 1rem; font-weight: 600; margin: 16px 0 6px; }
 .label { color: var(--muted); font-size: .9rem; }
 
 table { width: 100%; border-collapse: collapse; }
-th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line);
+th, td { text-align: start; padding: 10px 12px; border-bottom: 1px solid var(--line);
          vertical-align: middle; }
 th { color: var(--muted); font-size: .78rem; font-weight: 600; text-transform: uppercase;
      letter-spacing: .04em; }
@@ -129,7 +129,7 @@ button:hover, .button:hover { background: #245a95; }
 button:active, .button:active { transform: translateY(1px); }
 .button.light { background: transparent; color: var(--accent); border: 1px solid var(--line); }
 .button.light:hover { background: var(--accent-soft); }
-.tabs a { margin-right: 16px; text-decoration: none; font-weight: 600; }
+.tabs a { margin-inline-end: 16px; text-decoration: none; font-weight: 600; }
 .tabs a.current { text-decoration: underline; text-underline-offset: 6px; }
 .pager { display: flex; gap: 12px; align-items: center; margin-top: 16px; }
 .kv { display: grid; grid-template-columns: 160px 1fr; gap: 8px 16px; margin: 0; }
@@ -157,4 +157,26 @@ tr[hidden] { display: none; }
   .kv { grid-template-columns: 1fr; gap: 2px; }
   .kv dd { margin-bottom: 8px; }
   nav strong { width: 100%; }
+}
+
+/* ---- Language links in the menu ---- */
+.lang-switch { display: flex; gap: 4px; }
+nav .lang-switch a { padding: 3px 8px; font-size: .78rem; border: 1px solid var(--line);
+                     border-radius: 6px; }
+nav .lang-switch a.current { background: var(--accent); border-color: var(--accent); color: #ffffff; }
+
+/* ---- Languages that need other fonts (Arabic, Chinese) ---- */
+html[lang="ar"] {
+  --font-text: "Segoe UI", Tahoma, "Noto Sans Arabic", "Inter", system-ui, Arial, sans-serif;
+  --font-heading: "Segoe UI", Tahoma, "Noto Sans Arabic", "Poppins", system-ui, Arial, sans-serif;
+}
+html[lang="zh"] {
+  --font-text: "Inter", "PingFang SC", "Microsoft YaHei", "Noto Sans SC", system-ui, sans-serif;
+  --font-heading: "Poppins", "PingFang SC", "Microsoft YaHei", "Noto Sans SC", system-ui, sans-serif;
+}
+/* Letter spacing and capital letters would break Arabic letters and look odd in Chinese */
+html[lang="ar"] th, html[lang="zh"] th,
+html[lang="ar"] h1, html[lang="ar"] h2, html[lang="ar"] nav strong,
+html[lang="zh"] h1, html[lang="zh"] h2, html[lang="zh"] nav strong {
+  letter-spacing: 0; text-transform: none;
 }
