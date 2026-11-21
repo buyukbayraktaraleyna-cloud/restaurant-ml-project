@@ -56,6 +56,7 @@ restaurant-ml-project/
 ├── train_model.py           training and testing of both models
 ├── save_results.py          writes metrics and predictions to PostgreSQL
 ├── show_results.py          reads the results back and shows them
+├── benchmark_index.py       index experiment (query time with and without index)
 ├── app.py                   web panel (Flask routes)
 ├── translations.py          texts of the five languages
 └── requirements.txt
@@ -216,11 +217,23 @@ Confusion matrices (rows are the real class, columns are the predicted class):
 ![Model comparison](outputs/model_comparison.png)
 
 The simpler Logistic Regression was a little better than the Random Forest and trained about ten times faster. The most important feature for the Random Forest is the number of votes (about 0.50), followed by the relative cost (0.14), the price range (0.07), the number of cuisines (0.05) and the country India (0.04). Many of the most confident mistakes are restaurants with a real rating close to 3.5, which is the hardest case with this threshold. The training times change a little on every run, but the metrics stay the same because the random seed is fixed.
+## Effect of the data structure on query time
+
+The task asks how the data structure affects processing time, so I ran a small experiment (`benchmark_index.py`). The real tables are not changed. The script makes two temporary copies of the `restaurants` table with about 478,000 rows each (every restaurant repeated 50 times), puts indexes on `country_code` and `aggregate_rating` in one copy only, and times the same queries on both. Each query runs 20 times and the median is reported.
+
+| Query | No index | With index | Speed-up | Plan |
+|---|---|---|---|---|
+| `country_code` = rarest country | 35.28 ms | 1.34 ms | 26.3x | Index Scan |
+| `aggregate_rating >= 4.8` | 84.17 ms | 16.40 ms | 5.1x | Bitmap Index Scan |
+| rarest country and `aggregate_rating >= 4.0` | 69.03 ms | 0.68 ms | 101.9x | Index Scan |
+
+Without an index, PostgreSQL has to read every row (a sequential scan). With an index it goes straight to the matching rows. The more selective the query is, the bigger the gain: the combined filter returns very few rows and got about 100 times faster. The `aggregate_rating >= 4.8` query returns many rows, so most of its time goes to reading the rows and the gain is smaller. On the real table, which has only 9,551 rows, the difference is too small to measure, so the indexes matter more when the data grows. I tested only the relational structure and I did not compare it with a document structure such as MongoDB.
+
+To run it: `python benchmark_index.py` (Docker must be running). The numbers change a little on every run.
 
 ## Limitations and possible improvements
 
 - The number of votes is the strongest feature, but a new restaurant has no votes yet. The model would work worse for new restaurants.
-- I only tested the relational structure (PostgreSQL tables). I did not compare it with a document structure such as MongoDB.
 - The 3.5 threshold was my choice. Other thresholds, or a regression model that predicts the rating itself, could be tried.
 - The models could be improved with more features and with cross-validation.
 - This is a single-machine setup. For much more data, the database could move to a managed or distributed service and the model could be offered through an API.
