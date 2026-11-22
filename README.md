@@ -57,6 +57,7 @@ restaurant-ml-project/
 ├── save_results.py          writes metrics and predictions to PostgreSQL
 ├── show_results.py          reads the results back and shows them
 ├── benchmark_index.py       index experiment (query time with and without index)
+├── benchmark_json.py        relational tables compared with JSON documents
 ├── run_experiments.py       cross-validation, threshold and no-votes experiments
 ├── app.py                   web panel (Flask routes)
 ├── translations.py          texts of the five languages
@@ -228,9 +229,29 @@ The task asks how the data structure affects processing time, so I ran a small e
 | `aggregate_rating >= 4.8` | 84.17 ms | 16.40 ms | 5.1x | Bitmap Index Scan |
 | rarest country and `aggregate_rating >= 4.0` | 69.03 ms | 0.68 ms | 101.9x | Index Scan |
 
-Without an index, PostgreSQL has to read every row (a sequential scan). With an index it goes straight to the matching rows. The more selective the query is, the bigger the gain: the combined filter returns very few rows and got about 100 times faster. The `aggregate_rating >= 4.8` query returns many rows, so most of its time goes to reading the rows and the gain is smaller. On the real table, which has only 9,551 rows, the difference is too small to measure, so the indexes matter more when the data grows. I tested only the relational structure and I did not compare it with a document structure such as MongoDB.
+Without an index, PostgreSQL has to read every row (a sequential scan). With an index it goes straight to the matching rows. The more selective the query is, the bigger the gain: the combined filter returns very few rows and got about 100 times faster. The `aggregate_rating >= 4.8` query returns many rows, so most of its time goes to reading the rows and the gain is smaller. On the real table, which has only 9,551 rows, the difference is too small to measure, so the indexes matter more when the data grows.For a comparison with a JSON document structure, see the next section.
 
 To run it: `python benchmark_index.py` (Docker must be running). The numbers change a little on every run.
+
+## Relational tables or JSON documents?
+
+The task also mentions the effect of a JSON document structure compared to a relational table structure. I compared both inside PostgreSQL (`benchmark_json.py`). The same restaurants are stored once as normal columns and once as one JSONB document per row. Both temporary copies have about 478,000 rows and similar indexes (B-tree indexes on `country_code` and `aggregate_rating`). The real tables are not changed. Each query runs 20 times and the median is reported.
+
+| Query | Relational | JSONB | JSONB / relational |
+|---|---|---|---|
+| `country_code` = rarest country | 1.13 ms | 1.85 ms | 1.6x |
+| `aggregate_rating >= 4.8` | 18.95 ms | 43.78 ms | 2.3x |
+| rarest country and `aggregate_rating >= 4.0` | 0.95 ms | 1.25 ms | 1.3x |
+| average rating per country | 78.48 ms | 188.72 ms | 2.4x |
+
+| | Relational | JSONB |
+|---|---|---|
+| Table size including indexes | 133.0 MB | 392.6 MB (3.0x) |
+
+The relational structure was faster in every query and about three times smaller. The JSONB table is bigger because every document stores all the field names again, and in every query PostgreSQL has to take the fields out of the document and convert them. A GIN index on the whole document answered the same country query in 8.32 ms, which is slower than the B-tree index (1.85 ms), because a GIN index is made for flexible searches on any field and not for a simple equality test. In this project every restaurant has the same fields, so the relational structure is the better choice. A document structure is more useful when the fields change from record to record. I did not test MongoDB itself, only the JSON document structure inside PostgreSQL.
+
+To run it: `python benchmark_json.py` (Docker must be running).
+
 ## More experiments
 
 To check how reliable the results are, I ran three more experiments (`run_experiments.py`). The data is read from PostgreSQL as before and nothing is written to the database.
