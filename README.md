@@ -13,7 +13,7 @@ I also added a small web panel (Flask, HTML, CSS and JavaScript) that shows the 
 
 Everything runs on one machine. PostgreSQL runs in a Docker container and the Python scripts run locally in a virtual environment. They talk over TCP on `localhost:5432` using SQLAlchemy and psycopg2. There is no API and no cache layer. The editable diagram is in `docs/architecture_diagram.drawio` (it opens in https://app.diagrams.net).
 
-The data flow has six steps:
+The data flow has seven steps:
 
 1. `load_data.py` imports the CSV and Excel files into PostgreSQL.
 2. `data_access.py` fetches the training data with a SQL `JOIN`.
@@ -21,6 +21,7 @@ The data flow has six steps:
 4. `save_results.py` writes the metrics and predictions back to PostgreSQL.
 5. `show_results.py` reads the results from the database and shows them.
 6. `app.py` (the web panel) reads the same tables and shows them in the browser.
+7. `save_model.py` saves the trained models to a file, and the panel loads it to predict the restaurants that visitors describe on the Predict page.
 
 ## Tools
 
@@ -61,6 +62,8 @@ restaurant-ml-project/
 ├── run_experiments.py       cross-validation, threshold and no-votes experiments
 ├── app.py                   web panel (Flask routes)
 ├── translations.py          texts of the five languages
+├── save_model.py            trains both models on all rated restaurants and saves them
+├── predictor.py             loads the saved models and prepares the inputs for them
 └── requirements.txt
 ```
 
@@ -172,6 +175,12 @@ Then open http://127.0.0.1:5000 in the browser. Docker must be running, because 
 
 To start over with an empty database, run `docker compose down -v` and `docker compose up -d`, then repeat steps 4 to 8 (and 9 if you want the panel). Step 4 cannot be run again on a database that already has the `predictions` table, because that table depends on `restaurants`.
 
+**9. Save the models for the Predict page (optional)**
+
+python save_model.py
+
+This trains both models on all rated restaurants and saves them to `models/restaurant_models.joblib`. The file is not uploaded to GitHub (it is in `.gitignore`), so run this once on every computer before you open the Predict page. If the file is missing, the Predict page shows a message that tells you to run this command.
+
 ## Web panel
 
 The panel does not train anything. It only reads the tables that the scripts filled, so it shows the same numbers as `show_results.py`.
@@ -183,6 +192,7 @@ Pages:
 - **Browse**: the restaurants with their predictions, with sorting and filtering in the table.
 - **Search**: search restaurants by name, with the result and the model predictions.
 - **Mistakes**: the predictions where the model was wrong, most confident first.
+- **Predict**: a "what if?" form. You describe a restaurant (country, cost, votes, price range, cuisines) and the two saved models say how likely it is to be rated 3.5 or higher. It also shows the result for the same restaurant with 0 votes, to show how much the models depend on the vote count. The result is an estimate, not a real rating.
 
 Other details:
 
@@ -190,6 +200,18 @@ Other details:
 - Light and dark theme. The choice is saved in the browser.
 - The search uses bind parameters, so user input is never pasted into the SQL text. If the database is not running or a table is missing, the panel shows a short error page that says what to do.
 - Structure: the routes are in `app.py`, the HTML is in `templates/`, and the design and the small interactions are in `static/style.css` and `static/app.js`.
+
+**JSON API.** The panel also has a small JSON API, so other programs can read the same data:
+
+| Address | What it returns |
+|---|---|
+| `GET /api/metrics` | the metrics of both models |
+| `GET /api/restaurants` | restaurants (options: `limit`, `offset`, `country`, `q`) |
+| `GET /api/restaurants/<id>` | one restaurant with its predictions |
+| `POST /api/predict` | the prediction for a restaurant described in JSON |
+
+Example: `POST /api/predict` with `{"country": "India", "cost": 600, "votes": 120, "price_range": 2, "table_booking": false, "online_delivery": true, "cuisines": ["North Indian"]}`.archite
+
 
 ## From the database to the model
 
