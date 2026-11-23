@@ -11,7 +11,7 @@ I also added a small web panel (Flask, HTML, CSS and JavaScript) that shows the 
 
 ![Architecture diagram](docs/architecture_diagram.png)
 
-Everything runs on one machine. PostgreSQL runs in a Docker container and the Python scripts run locally in a virtual environment. They talk over TCP on `localhost:5432` using SQLAlchemy and psycopg2. There is no API and no cache layer. The editable diagram is in `docs/architecture_diagram.drawio` (it opens in https://app.diagrams.net).
+Everything runs on one machine. PostgreSQL runs in a Docker container and the Python scripts run locally in a virtual environment. They talk over TCP on `localhost:5432` using SQLAlchemy and psycopg2.There is no cache layer. The web panel also offers a small JSON API. The editable diagram is in `docs/architecture_diagram.drawio` (it opens in https://app.diagrams.net).
 
 The data flow has seven steps:
 
@@ -43,7 +43,7 @@ restaurant-ml-project/
 ├── data/                    raw dataset files (only for the first import)
 ├── docs/                    architecture diagram (PNG and draw.io)
 ├── templates/               HTML pages of the web panel
-├── static/                  style.css and app.js of the web panel
+├── static/                  style.css, app.js and predict.js of the web panel
 ├── outputs/                 chart created by show_results.py
 ├── sql/
 │   ├── schema.sql           countries and restaurants tables
@@ -165,7 +165,15 @@ docker exec restaurant_db psql -U student -d restaurant_ml -c "SELECT model_name
 
 The second query calculates the test accuracy again in SQL, using only the stored predictions.
 
-**9. Start the web panel (optional)**
+**9. Save the trained models (needed for the Predict page)**
+
+```
+python save_model.py
+```
+
+It trains both models on all rated restaurants and saves them to `models/restaurant_models.joblib`. The file is not uploaded to GitHub (it is in `.gitignore`), so run this once on every computer before you open the Predict page. If the file is missing, the Predict page shows a message that tells you to run this command.
+
+**10. Start the web panel (optional)**
 
 ```
 python app.py
@@ -173,13 +181,7 @@ python app.py
 
 Then open http://127.0.0.1:5000 in the browser. Docker must be running, because the panel reads everything from PostgreSQL. Press `Ctrl+C` in the terminal to stop it.
 
-To start over with an empty database, run `docker compose down -v` and `docker compose up -d`, then repeat steps 4 to 8 (and 9 if you want the panel). Step 4 cannot be run again on a database that already has the `predictions` table, because that table depends on `restaurants`.
-
-**9. Save the models for the Predict page (optional)**
-
-python save_model.py
-
-This trains both models on all rated restaurants and saves them to `models/restaurant_models.joblib`. The file is not uploaded to GitHub (it is in `.gitignore`), so run this once on every computer before you open the Predict page. If the file is missing, the Predict page shows a message that tells you to run this command.
+To start over with an empty database, run `docker compose down -v` and `docker compose up -d`, then repeat steps 4 to 8 (and 9 and 10 if you want the panel). Step 4 cannot be run again on a database that already has the `predictions` table, because that table depends on `restaurants`.
 
 ## Web panel
 
@@ -314,6 +316,6 @@ To run it: `python run_experiments.py` (Docker must be running).
 ## Limitations and possible improvements
 
 - The number of votes is the strongest feature, but a new restaurant has no votes yet. Without it the accuracy drops by about 10 points (see "More experiments").
-- The 3.5 threshold was my choice. Other thresholds, or a regression model that predicts the rating itself, could be tried.
-- The models could be improved with more features and with cross-validation.
-- This is a single-machine setup. For much more data, the database could move to a managed or distributed service and the model could be offered through an API.
+- The 3.5 threshold was my choice. I tested 3.0 and 4.0 as well (see "More experiments"). A regression model that predicts the rating itself could also be tried.
+- The models could be improved with more features and with hyperparameter tuning. I already checked the results with 5-fold cross-validation.
+- This is a single-machine setup. For much more data, the database could move to a managed or distributed service. The model is already offered through a small JSON API and the Predict page, but the panel runs on Flask's development server. For real use it would need a production server and authentication.
