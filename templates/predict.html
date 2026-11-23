@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block title %}{{ t('predict_title') }}{% endblock %}
+{% block content %}
+<h1>{{ t('predict_title') }}</h1>
+<p class="sub">{{ t('predict_sub') }}</p>
+
+{% if no_model %}
+<div class="card">{{ t('predict_no_model') }}</div>
+{% else %}
+
+<form method="get" action="/predict" class="card">
+  <div class="form-grid">
+    <label class="field"><span>{{ t('label_country') }}</span>
+      <select name="country" id="country" required>
+        <option value="">{{ t('choose_country') }}</option>
+        {% for c in countries %}
+        <option value="{{ c }}" {{ 'selected' if c == f.country }}>{{ c }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label class="field"><span>{{ t('label_cost') }}</span>
+      <input type="number" name="cost" id="cost" min="0" step="any" value="{{ f.cost }}" required>
+      <small class="muted" id="cost-hint" data-currency="{{ t('hint_currency') }}" data-typical="{{ t('hint_typical') }}"></small>
+    </label>
+    <label class="field"><span>{{ t('label_votes') }}</span>
+      <input type="number" name="votes" min="0" step="1" value="{{ f.votes }}" required>
+    </label>
+    <label class="field"><span>{{ t('label_price') }}</span>
+      <select name="price_range">
+        {% for n in [1, 2, 3, 4] %}
+        <option value="{{ n }}" {{ 'selected' if f.price_range == n|string }}>{{ t('price_range_of', n=n) }}</option>
+        {% endfor %}
+      </select>
+    </label>
+  </div>
+
+  <div class="checks">
+    <label><input type="checkbox" name="table_booking" value="1" {{ 'checked' if f.table_booking }}> {{ t('table_booking') }}</label>
+    <label><input type="checkbox" name="online_delivery" value="1" {{ 'checked' if f.online_delivery }}> {{ t('online_delivery') }}</label>
+  </div>
+
+  <h3>{{ t('label_cuisines') }}</h3>
+  <div class="checks">
+    {% for c in cuisines %}
+    <label><input type="checkbox" name="cuisines" value="{{ c }}" {{ 'checked' if c in f.cuisines }}> {{ c }}</label>
+    {% endfor %}
+  </div>
+
+  <p><button type="submit">{{ t('predict_button') }}</button></p>
+</form>
+<script type="application/json" id="country-info">{{ country_info|tojson }}</script>
+
+{% if error %}
+<div class="card"><span class="bad">{{ t('predict_bad_input') }}</span></div>
+{% endif %}
+
+{% if result %}
+<div class="card">
+  <h2>{{ t('predict_result_title') }}</h2>
+  <p class="muted">{{ t('predict_rel_cost', ratio=result.relative_cost, currency=result.currency) }}</p>
+  <div class="table-scroll"><table>
+    <thead>
+      <tr><th>{{ t('col_model') }}</th><th>{{ t('predict_col_with_votes') }}</th><th>{{ t('predict_col_no_votes') }}</th></tr>
+    </thead>
+    <tbody>
+    {% for model, p in result.probabilities.items() %}
+    <tr>
+      <td><strong>{{ model }}</strong></td>
+      {% for key in ["with_votes", "no_votes"] %}
+      <td>
+        <span class="pill {{ 'good' if p[key] >= 0.5 else 'bad' }}">{{ t('pred_high') if p[key] >= 0.5 else t('pred_not_high') }}</span>
+        {{ "%.1f"|format(p[key] * 100) }}%
+        {{ ui.bar(p[key] * 100) }}
+      </td>
+      {% endfor %}
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+  <p class="muted">{{ t('predict_note', n=trained_rows) }}</p>
+</div>
+{% endif %}
+
+{% endif %}
+{% endblock %}
+{% block scripts %}<script src="{{ url_for('static', filename='predict.js') }}"></script>{% endblock %}

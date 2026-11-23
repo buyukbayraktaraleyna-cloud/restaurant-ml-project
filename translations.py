@@ -635,6 +635,118 @@ TEXTS["zh"] = {
 }
 
 
+# ---- Predict page and JSON API (step 17) ----
+TEXTS["en"].update({
+    "nav_predict": "Predict",
+    "predict_title": "What if? Predict a restaurant",
+    "predict_sub": "Describe a restaurant and the saved models say how likely it is to be rated 3.5 or higher. Change one value and ask again to see what matters.",
+    "label_country": "Country",
+    "choose_country": "Choose a country",
+    "label_cost": "Average cost for two",
+    "label_votes": "Number of votes",
+    "label_price": "Price range",
+    "label_cuisines": "Cuisines (optional)",
+    "hint_currency": "Currency",
+    "hint_typical": "typical cost for two",
+    "predict_button": "Predict",
+    "predict_result_title": "Prediction",
+    "predict_col_with_votes": "With the votes you entered",
+    "predict_col_no_votes": "As a brand-new restaurant (0 votes)",
+    "predict_rel_cost": "Your cost is {ratio} times the typical cost in {currency}.",
+    "predict_note": "This is an estimate of the trained models, not a real rating. The models were trained on all {n} rated restaurants of the database.",
+    "predict_no_model": "The model file was not found. Run <code>python save_model.py</code> once, then reload this page.",
+    "predict_bad_input": "Some values are not valid. Please check the country, the cost, the votes and the price range.",
+})
+
+TEXTS["tr"].update({
+    "nav_predict": "Tahmin",
+    "predict_title": "Ya şöyle olsaydı? Bir restoranı tahmin et",
+    "predict_sub": "Bir restoranı tarif edin, kayıtlı modeller 3,5 veya üzeri puan alma olasılığını söylesin. Tek bir değeri değiştirip tekrar sorarak neyin önemli olduğunu görebilirsiniz.",
+    "label_country": "Ülke",
+    "choose_country": "Ülke seçin",
+    "label_cost": "İki kişilik ortalama maliyet",
+    "label_votes": "Oy sayısı",
+    "label_price": "Fiyat aralığı",
+    "label_cuisines": "Mutfaklar (isteğe bağlı)",
+    "hint_currency": "Para birimi",
+    "hint_typical": "iki kişilik tipik maliyet",
+    "predict_button": "Tahmin et",
+    "predict_result_title": "Tahmin",
+    "predict_col_with_votes": "Girdiğiniz oy sayısıyla",
+    "predict_col_no_votes": "Yepyeni bir restoran olarak (0 oy)",
+    "predict_rel_cost": "Girdiğiniz maliyet, {currency} için tipik maliyetin {ratio} katı.",
+    "predict_note": "Bu, eğitilmiş modellerin bir tahminidir, gerçek bir puan değildir. Modeller veritabanındaki puanlanmış {n} restoranın tamamıyla eğitildi.",
+    "predict_no_model": "Model dosyası bulunamadı. Bir kez <code>python save_model.py</code> komutunu çalıştırın, sonra bu sayfayı yenileyin.",
+    "predict_bad_input": "Bazı değerler geçerli değil. Lütfen ülkeyi, maliyeti, oy sayısını ve fiyat aralığını kontrol edin.",
+})
+
+TEXTS["de"].update({
+    "nav_predict": "Vorhersage",
+    "predict_title": "Was wäre wenn? Ein Restaurant vorhersagen",
+    "predict_sub": "Beschreiben Sie ein Restaurant, und die gespeicherten Modelle sagen, wie wahrscheinlich eine Bewertung von 3,5 oder mehr ist. Ändern Sie einen Wert und fragen Sie erneut, um zu sehen, was wichtig ist.",
+    "label_country": "Land",
+    "choose_country": "Land wählen",
+    "label_cost": "Durchschnittliche Kosten für zwei",
+    "label_votes": "Anzahl der Stimmen",
+    "label_price": "Preisklasse",
+    "label_cuisines": "Küchen (optional)",
+    "hint_currency": "Währung",
+    "hint_typical": "typische Kosten für zwei",
+    "predict_button": "Vorhersagen",
+    "predict_result_title": "Vorhersage",
+    "predict_col_with_votes": "Mit den eingegebenen Stimmen",
+    "predict_col_no_votes": "Als brandneues Restaurant (0 Stimmen)",
+    "predict_rel_cost": "Ihre Kosten sind das {ratio}-Fache der typischen Kosten in {currency}.",
+    "predict_note": "Das ist eine Schätzung der trainierten Modelle, keine echte Bewertung. Die Modelle wurden mit allen {n} bewerteten Restaurants der Datenbank trainiert.",
+    "predict_no_model": "Die Modelldatei wurde nicht gefunden. Führen Sie einmal <code>python save_model.py</code> aus und laden Sie diese Seite neu.",
+    "predict_bad_input": "Einige Werte sind ungültig. Bitte prüfen Sie Land, Kosten, Stimmen und Preisklasse.",
+})
+
+TEXTS["ar"].update({
+    "nav_predict": "التنبؤ",
+    "predict_title": "ماذا لو؟ تنبّأ بتقييم مطعم",
+    "predict_sub": "صِف مطعمًا وستخبرك النماذج المحفوظة بمدى احتمال أن يكون تقييمه 3.5 أو أعلى. غيّر قيمة واحدة واسأل مجددًا لترى ما الذي يهم.",
+    "label_country": "البلد",
+    "choose_country": "اختر بلدًا",
+    "label_cost": "متوسط التكلفة لشخصين",
+    "label_votes": "عدد الأصوات",
+    "label_price": "فئة السعر",
+    "label_cuisines": "المطابخ (اختياري)",
+    "hint_currency": "العملة",
+    "hint_typical": "التكلفة المعتادة لشخصين",
+    "predict_button": "تنبّأ",
+    "predict_result_title": "التنبؤ",
+    "predict_col_with_votes": "بعدد الأصوات الذي أدخلته",
+    "predict_col_no_votes": "كمطعم جديد تمامًا (0 صوت)",
+    "predict_rel_cost": "تكلفتك تساوي {ratio} مرة التكلفة المعتادة بعملة {currency}.",
+    "predict_note": "هذا تقدير من النماذج المدرَّبة وليس تقييمًا حقيقيًا. دُرِّبت النماذج على جميع المطاعم المقيَّمة في قاعدة البيانات وعددها {n}.",
+    "predict_no_model": "لم يتم العثور على ملف النموذج. شغّل <code>python save_model.py</code> مرة واحدة ثم أعد تحميل هذه الصفحة.",
+    "predict_bad_input": "بعض القيم غير صالحة. يُرجى التحقق من البلد والتكلفة وعدد الأصوات وفئة السعر.",
+})
+
+TEXTS["zh"].update({
+    "nav_predict": "预测",
+    "predict_title": "如果……会怎样？预测一家餐厅",
+    "predict_sub": "描述一家餐厅，已保存的模型会告诉你它获得 3.5 分或更高评分的可能性。改变一个值再预测一次，就能看出什么最重要。",
+    "label_country": "国家",
+    "choose_country": "选择国家",
+    "label_cost": "两人平均消费",
+    "label_votes": "投票数",
+    "label_price": "价格区间",
+    "label_cuisines": "菜系（可选）",
+    "hint_currency": "货币",
+    "hint_typical": "两人典型消费",
+    "predict_button": "预测",
+    "predict_result_title": "预测结果",
+    "predict_col_with_votes": "按你输入的投票数",
+    "predict_col_no_votes": "作为全新餐厅（0 票）",
+    "predict_rel_cost": "你输入的消费是 {currency} 典型消费的 {ratio} 倍。",
+    "predict_note": "这是已训练模型的估计，并非真实评分。模型使用了数据库中全部 {n} 家有评分的餐厅进行训练。",
+    "predict_no_model": "未找到模型文件。请先运行一次 <code>python save_model.py</code>，然后重新加载此页面。",
+    "predict_bad_input": "有些值无效。请检查国家、消费、投票数和价格区间。",
+})
+
+
 def translate(key, language, **params):
     """Return the text for `key` in `language` (English if the key is missing)."""
     text = TEXTS.get(language, {}).get(key)

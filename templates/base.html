@@ -19,6 +19,7 @@
   <a href="/restaurants" class="{{ 'active' if active == 'browse' }}">{{ t('nav_browse') }}</a>
   <a href="/search" class="{{ 'active' if active == 'search' }}">{{ t('nav_search') }}</a>
   <a href="/mistakes" class="{{ 'active' if active == 'mistakes' }}">{{ t('nav_mistakes') }}</a>
+  <a href="/predict" class="{{ 'active' if active == 'predict' }}">{{ t('nav_predict') }}</a>
   <span class="lang-switch" title="{{ t('language') }}">
     {% for code, name in languages.items() %}
     <a href="/lang/{{ code }}?next={{ current_url|urlencode }}" class="{{ 'current' if code == lang }}" title="{{ name }}">{{ code|upper }}</a>
@@ -30,5 +31,6 @@
 {% block content %}{% endblock %}
 </div></main>
 <footer><div class="wrap">{{ t('footer') }}</div></footer>
+{% block scripts %}{% endblock %}
 </body>
 </html>

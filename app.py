@@ -11,7 +11,14 @@ Pages:
     /search                 search by name and see the predictions directly
     /mistakes               most confident mistakes of a model
     /export/predictions.csv download all stored predictions
+    /predict                "what if?" form: the saved models predict a restaurant you describe
     /lang/<code>            choose the language (en, tr, de, ar, zh)
+
+JSON API (step 17):
+    GET  /api/metrics               metrics of the models
+    GET  /api/restaurants           restaurants (?limit=&offset=&country=&q=)
+    GET  /api/restaurants/<id>      one restaurant with its predictions
+    POST /api/predict               prediction for a restaurant described in JSON
 
 The HTML pages are in the templates folder, the CSS and JavaScript are in the static folder.
 The panel only reads from the database, it never changes any data.
@@ -19,13 +26,16 @@ The panel only reads from the database, it never changes any data.
 
 import csv
 import io
+import math
+from decimal import Decimal
 from math import ceil
 from urllib.parse import urlencode
 
-from flask import Flask, Response, abort, redirect, render_template, request
+from flask import Flask, Response, abort, jsonify, redirect, render_template, request
 from sqlalchemy import text
 from sqlalchemy.exc import OperationalError, ProgrammingError
 
+import predictor
 from db import get_engine
 from translations import DEFAULT_LANGUAGE, LANGUAGES, RTL_LANGUAGES, translate
 
@@ -382,6 +392,278 @@ def mistakes():
     return render_template("mistakes.html", active="mistakes", models=models, model=model, rows=rows)
 
 
+# ---------------------------------------------------------------------------
+# "What if?" prediction (step 17): the form and the JSON API use the same code
+# ---------------------------------------------------------------------------
+
+
+class InputError(ValueError):
+    """The values of the form or of the JSON request are not valid."""
+
+
+def country_cost_info():
+    """Currency and typical cost for two of every country (from the rated restaurants).
+
+    The models use the cost relative to the median cost of the currency, so the
+    median is needed to turn the cost typed by the visitor into the model feature.
+    """
+    medians = {
+        row["currency"]: row["median_cost"]
+        for row in fetch_all(
+            """
+            SELECT currency,
+                   percentile_cont(0.5) WITHIN GROUP (ORDER BY average_cost_for_two) AS median_cost
+            FROM restaurants
+            WHERE aggregate_rating > 0
+            GROUP BY currency
+            """
+        )
+    }
+    rows = fetch_all(
+        """
+        SELECT c.country_name, r.currency, COUNT(*) AS n
+        FROM restaurants r
+        JOIN countries c ON c.country_code = r.country_code
+        WHERE r.aggregate_rating > 0
+        GROUP BY c.country_name, r.currency
+        ORDER BY c.country_name, n DESC
+        """
+    )
+    info = {}
+    for row in rows:
+        if row["country_name"] not in info:  # the most common currency comes first
+            median = float(medians.get(row["currency"]) or 0)
+            info[row["country_name"]] = {"currency": row["currency"], "median": round(median, 2)}
+    return info
+
+
+def as_bool(value):
+    """True for the usual 'yes' values (checkbox 'on', '1', 'true', JSON true)."""
+    return str(value).strip().lower() in ("1", "on", "true", "yes")
+
+
+def parse_prediction_inputs(data, bundle, info):
+    """Check the values and return them in a clean form. Raises InputError if something is wrong."""
+    country = str(data.get("country", "")).strip()
+    if country not in info or country not in predictor.country_names(bundle):
+        raise InputError("country")
+    try:
+        cost = float(data.get("cost"))
+        votes = int(float(data.get("votes")))
+        price_range = int(float(data.get("price_range")))
+    except (TypeError, ValueError):
+        raise InputError("number")
+    if not math.isfinite(cost) or not 0 <= cost <= 10_000_000:
+        raise InputError("cost")
+    if not 0 <= votes <= 10_000_000:
+        raise InputError("votes")
+    if price_range not in (1, 2, 3, 4):
+        raise InputError("price_range")
+
+    known = predictor.cuisine_labels(bundle)
+    cuisines = data.get("cuisines") or []
+    if not isinstance(cuisines, list) or any(c not in known for c in cuisines):
+        raise InputError("cuisines")
+
+    return {
+        "country": country,
+        "cost": cost,
+        "votes": votes,
+        "price_range": price_range,
+        "table_booking": as_bool(data.get("table_booking", False)),
+        "online_delivery": as_bool(data.get("online_delivery", False)),
+        "cuisines": cuisines,
+    }
+
+
+def run_prediction(values, bundle, info):
+    """Predict twice: with the votes given, and as a brand-new restaurant with 0 votes."""
+    country_info = info[values["country"]]
+    probabilities = {}
+    for key, votes in (("with_votes", values["votes"]), ("no_votes", 0)):
+        frame = predictor.build_row(
+            bundle, values["country"], values["cost"], country_info["median"], votes,
+            values["price_range"], values["table_booking"], values["online_delivery"],
+            values["cuisines"],
+        )
+        for model_name, probability in predictor.predict(bundle, frame).items():
+            probabilities.setdefault(model_name, {})[key] = probability
+    median = country_info["median"]
+    return {
+        "currency": country_info["currency"],
+        "relative_cost": round(values["cost"] / median, 2) if median > 0 else 1.0,
+        "probabilities": dict(sorted(probabilities.items())),
+    }
+
+
+@app.route("/predict")
+def predict_page():
+    """Form where the visitor describes a restaurant and the saved models predict the rating class."""
+    bundle = predictor.load_bundle()
+    if bundle is None:
+        return render_template("predict.html", active="predict", no_model=True)
+
+    info = country_cost_info()
+    known_countries = predictor.country_names(bundle)
+    country_info = {name: data for name, data in info.items() if name in known_countries}
+    f = {
+        "country": request.args.get("country", ""),
+        "cost": request.args.get("cost", ""),
+        "votes": request.args.get("votes", "50"),
+        "price_range": request.args.get("price_range", "2"),
+        "table_booking": as_bool(request.args.get("table_booking", False)),
+        "online_delivery": as_bool(request.args.get("online_delivery", False)),
+        "cuisines": request.args.getlist("cuisines"),
+    }
+
+    result, error = None, False
+    if request.args.get("country"):  # the form was sent
+        try:
+            values = parse_prediction_inputs(f, bundle, info)
+            result = run_prediction(values, bundle, info)
+        except InputError:
+            error = True
+
+    return render_template(
+        "predict.html",
+        active="predict",
+        no_model=False,
+        f=f,
+        countries=sorted(country_info),
+        country_info=country_info,
+        cuisines=predictor.cuisine_labels(bundle),
+        trained_rows=bundle["trained_rows"],
+        result=result,
+        error=error,
+    )
+
+
+# ---------------------------------------------------------------------------
+# JSON API (step 17)
+# ---------------------------------------------------------------------------
+
+
+def jsonable(value):
+    """Decimal numbers (from PostgreSQL NUMERIC columns) become normal floats for JSON."""
+    if isinstance(value, Decimal):
+        return float(value)
+    if isinstance(value, dict):
+        return {key: jsonable(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [jsonable(item) for item in value]
+    return value
+
+
+def api_error(message, status):
+    """JSON error answer for the API."""
+    return jsonify({"error": message}), status
+
+
+@app.route("/api/metrics")
+def api_metrics():
+    """Metrics of all models."""
+    rows = fetch_all(
+        """
+        SELECT model_name, accuracy, precision_score, recall_score, f1_score,
+               train_seconds, test_rows
+        FROM model_metrics
+        ORDER BY model_name
+        """
+    )
+    return jsonify(jsonable(rows))
+
+
+@app.route("/api/restaurants")
+def api_restaurants():
+    """Restaurants as JSON. Optional: ?limit=20&offset=0&country=<code>&q=<text>."""
+    try:
+        limit = min(max(int(request.args.get("limit", "20")), 1), 100)
+        offset = max(int(request.args.get("offset", "0")), 0)
+    except ValueError:
+        return api_error("limit and offset must be whole numbers", 400)
+
+    conditions, params = [], {}
+    country = request.args.get("country", "").strip()
+    if country:
+        if not country.isdigit():
+            return api_error("country must be a country code (a number)", 400)
+        conditions.append("r.country_code = :country")
+        params["country"] = int(country)
+    q = request.args.get("q", "").strip()
+    if q:
+        conditions.append("r.restaurant_name ILIKE :pattern")
+        params["pattern"] = like_pattern(q)
+    where = "WHERE " + " AND ".join(conditions) if conditions else ""
+
+    total = fetch_all(f"SELECT COUNT(*) AS n FROM restaurants r {where}", **params)[0]["n"]
+    rows = fetch_all(
+        f"""
+        SELECT r.restaurant_id, r.restaurant_name, r.city, c.country_name,
+               r.price_range, r.aggregate_rating, r.votes
+        FROM restaurants r
+        JOIN countries c ON c.country_code = r.country_code
+        {where}
+        ORDER BY r.votes DESC, r.restaurant_id
+        LIMIT :limit OFFSET :offset
+        """,
+        limit=limit,
+        offset=offset,
+        **params,
+    )
+    return jsonify(jsonable({"total": total, "limit": limit, "offset": offset, "results": rows}))
+
+
+@app.route("/api/restaurants/<int:restaurant_id>")
+def api_restaurant(restaurant_id):
+    """One restaurant with the prediction of each model."""
+    rows = fetch_all(
+        """
+        SELECT r.restaurant_id, r.restaurant_name, r.city, r.cuisines,
+               r.average_cost_for_two, r.currency, r.price_range,
+               r.has_table_booking, r.has_online_delivery, r.votes,
+               r.aggregate_rating, c.country_name
+        FROM restaurants r
+        JOIN countries c ON c.country_code = r.country_code
+        WHERE r.restaurant_id = :rid
+        """,
+        rid=restaurant_id,
+    )
+    if not rows:
+        return api_error("restaurant not found", 404)
+    predictions = fetch_all(
+        """
+        SELECT model_name, predicted_label, high_probability, actual_label, is_test_row
+        FROM predictions
+        WHERE restaurant_id = :rid
+        ORDER BY model_name
+        """,
+        rid=restaurant_id,
+    )
+    return jsonify(jsonable({"restaurant": rows[0], "predictions": predictions}))
+
+
+@app.route("/api/predict", methods=["POST"])
+def api_predict():
+    """Prediction for a restaurant described in JSON.
+
+    Example body:
+      {"country": "India", "cost": 600, "votes": 120, "price_range": 2,
+       "table_booking": false, "online_delivery": true, "cuisines": ["North Indian"]}
+    """
+    bundle = predictor.load_bundle()
+    if bundle is None:
+        return api_error("model file not found, run python save_model.py first", 503)
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return api_error("send a JSON object", 400)
+    info = country_cost_info()
+    try:
+        values = parse_prediction_inputs(data, bundle, info)
+    except InputError as problem:
+        return api_error(f"invalid value: {problem}", 400)
+    return jsonify({"input": values, **run_prediction(values, bundle, info)})
+
+
 @app.route("/lang/<code>")
 def set_language(code):
     """Remember the chosen language in a cookie and go back to the page the visitor came from."""
@@ -436,15 +718,27 @@ def export_predictions():
 @app.errorhandler(404)
 def not_found(error):
     """Shown when a page or a restaurant does not exist."""
+    if request.path.startswith("/api/"):
+        return api_error("not found", 404)
     return (
         render_template("error.html", active="", heading=t("err_404_heading"), lines=[t("err_404_line")]),
         404,
     )
 
 
+@app.errorhandler(405)
+def method_not_allowed(error):
+    """Wrong HTTP method, for example GET on /api/predict."""
+    if request.path.startswith("/api/"):
+        return api_error("method not allowed", 405)
+    return not_found(error)
+
+
 @app.errorhandler(OperationalError)
 def database_unreachable(error):
     """Shown when PostgreSQL is not running (for example Docker is closed)."""
+    if request.path.startswith("/api/"):
+        return api_error("database is not reachable", 503)
     lines = [t("err_db_1"), t("err_db_2"), t("err_reload")]
     return render_template("error.html", active="", heading=t("err_db_heading"), lines=lines), 503
 
@@ -452,6 +746,8 @@ def database_unreachable(error):
 @app.errorhandler(ProgrammingError)
 def table_missing(error):
     """Shown when a table does not exist yet."""
+    if request.path.startswith("/api/"):
+        return api_error("a table is missing", 500)
     lines = [t("err_table_1"), t("err_table_2"), t("err_reload")]
     return render_template("error.html", active="", heading=t("err_table_heading"), lines=lines), 500
 
