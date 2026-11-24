@@ -11,7 +11,7 @@ I also added a small web panel (Flask, HTML, CSS and JavaScript) that shows the 
 
 ![Architecture diagram](docs/architecture_diagram.png)
 
-Everything runs on one machine. PostgreSQL runs in a Docker container and the Python scripts run locally in a virtual environment. They talk over TCP on `localhost:5432` using SQLAlchemy and psycopg2.There is no cache layer. The web panel also offers a small JSON API. The editable diagram is in `docs/architecture_diagram.drawio` (it opens in https://app.diagrams.net).
+Everything runs on one machine. PostgreSQL runs in a Docker container and the Python scripts run locally in a virtual environment. They talk over TCP on `localhost:5432` using SQLAlchemy and psycopg2. There is no cache layer. The web panel also offers a small JSON API. The editable diagram is in `docs/architecture_diagram.drawio` (it opens in https://app.diagrams.net).
 
 The data flow has seven steps:
 
@@ -201,7 +201,7 @@ Other details:
 - Language buttons EN, TR, DE, AR and ZH. The choice is saved in a cookie. Arabic is shown right to left. All texts are in `translations.py`.
 - Light and dark theme. The choice is saved in the browser.
 - The search uses bind parameters, so user input is never pasted into the SQL text. If the database is not running or a table is missing, the panel shows a short error page that says what to do.
-- Structure: the routes are in `app.py`, the HTML is in `templates/`, and the design and the small interactions are in `static/style.css` and `static/app.js`.
+- Structure: the routes are in `app.py`, the HTML is in `templates/`, and the design and the small interactions are in `static/style.css`, `static/app.js` and `static/predict.js`.
 
 **JSON API.** The panel also has a small JSON API, so other programs can read the same data:
 
@@ -212,7 +212,7 @@ Other details:
 | `GET /api/restaurants/<id>` | one restaurant with its predictions |
 | `POST /api/predict` | the prediction for a restaurant described in JSON |
 
-Example: `POST /api/predict` with `{"country": "India", "cost": 600, "votes": 120, "price_range": 2, "table_booking": false, "online_delivery": true, "cuisines": ["North Indian"]}`.archite
+Example: `POST /api/predict` with `{"country": "India", "cost": 600, "votes": 120, "price_range": 2, "table_booking": false, "online_delivery": true, "cuisines": ["North Indian"]}`
 
 
 ## From the database to the model
