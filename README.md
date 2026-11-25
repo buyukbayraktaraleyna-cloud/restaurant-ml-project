@@ -87,7 +87,8 @@ Why I designed it this way:
 
 ## How to run it
 
-I ran everything on Windows. You need Git, Docker Desktop and Python 3.13 (a recent Python 3 should also work).
+I ran everything on Windows. You need Git, Docker Desktop and Python 3.13. The packages in `requirements.txt` need Python 3.12 or newer (the installation failed on Python 3.11), so check your version with `python --version` before you start.
+
 
 **1. Clone the repository**
 
@@ -194,7 +195,7 @@ Pages:
 - **Browse**: the restaurants with their predictions, with sorting and filtering in the table.
 - **Search**: search restaurants by name, with the result and the model predictions.
 - **Mistakes**: the predictions where the model was wrong, most confident first.
-- **Predict**: a "what if?" form. You describe a restaurant (country, cost, votes, price range, cuisines) and the two saved models say how likely it is to be rated 3.5 or higher. It also shows the result for the same restaurant with 0 votes, to show how much the models depend on the vote count. The result is an estimate, not a real rating.
+- **Predict**: a "what if?" form. You describe a restaurant (country, cost, votes, price range, table booking, online delivery, cuisines) and the two saved models say how likely it is to be rated 3.5 or higher. It also shows the result for the same restaurant with 0 votes, to show how much the models depend on the vote count. The result is an estimate, not a real rating.
 
 Other details:
 
@@ -243,6 +244,7 @@ Confusion matrices (rows are the real class, columns are the predicted class):
 ![Model comparison](outputs/model_comparison.png)
 
 The simpler Logistic Regression was a little better than the Random Forest and trained about ten times faster. The most important feature for the Random Forest is the number of votes (about 0.50), followed by the relative cost (0.14), the price range (0.07), the number of cuisines (0.05) and the country India (0.04). Many of the most confident mistakes are restaurants with a real rating close to 3.5, which is the hardest case with this threshold. The training times change a little on every run, but the metrics stay the same because the random seed is fixed.
+
 ## Effect of the data structure on query time
 
 The task asks how the data structure affects processing time, so I ran a small experiment (`benchmark_index.py`). The real tables are not changed. The script makes two temporary copies of the `restaurants` table with about 478,000 rows each (every restaurant repeated 50 times), puts indexes on `country_code` and `aggregate_rating` in one copy only, and times the same queries on both. Each query runs 20 times and the median is reported.
@@ -253,7 +255,7 @@ The task asks how the data structure affects processing time, so I ran a small e
 | `aggregate_rating >= 4.8` | 84.17 ms | 16.40 ms | 5.1x | Bitmap Index Scan |
 | rarest country and `aggregate_rating >= 4.0` | 69.03 ms | 0.68 ms | 101.9x | Index Scan |
 
-Without an index, PostgreSQL has to read every row (a sequential scan). With an index it goes straight to the matching rows. The more selective the query is, the bigger the gain: the combined filter returns very few rows and got about 100 times faster. The `aggregate_rating >= 4.8` query returns many rows, so most of its time goes to reading the rows and the gain is smaller. On the real table, which has only 9,551 rows, the difference is too small to measure, so the indexes matter more when the data grows.For a comparison with a JSON document structure, see the next section.
+Without an index, PostgreSQL has to read every row (a sequential scan). With an index it goes straight to the matching rows. The more selective the query is, the bigger the gain: the combined filter returns very few rows and got about 100 times faster. The `aggregate_rating >= 4.8` query returns many rows, so most of its time goes to reading the rows and the gain is smaller. On the real table, which has only 9,551 rows, the difference is too small to measure, so the indexes matter more when the data grows. For a comparison with a JSON document structure, see the next section.
 
 To run it: `python benchmark_index.py` (Docker must be running). The numbers change a little on every run.
 
