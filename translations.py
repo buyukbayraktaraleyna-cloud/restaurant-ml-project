@@ -23,7 +23,7 @@ TEXTS = {
         "nav_mistakes": "Mistakes",
         "theme_title": "Switch between light and dark theme",
         "language": "Language",
-        "footer": "Data: Zomato Restaurants (Kaggle). Everything on this site is read live from PostgreSQL.",
+        "footer": "Data: Zomato Restaurants (Kaggle). The results are read live from PostgreSQL; the Predict page also uses the saved models. ",
         "error_title": "Error",
         # words used in several pages
         "yes": "Yes",
@@ -146,7 +146,7 @@ TEXTS = {
         "nav_mistakes": "Hatalar",
         "theme_title": "Açık ve koyu tema arasında geçiş yap",
         "language": "Dil",
-        "footer": "Veri: Zomato Restoranları (Kaggle). Bu sitedeki her şey canlı olarak PostgreSQL'den okunur.",
+        "footer": "Veri: Zomato Restoranları (Kaggle). Sonuçlar PostgreSQL üzerinden canlı okunur; Tahmin sayfası ayrıca kayıtlı modelleri kullanır.",
         "error_title": "Hata",
         # words used in several pages
         "yes": "Evet",
@@ -272,7 +272,7 @@ TEXTS["de"] = {
     "nav_mistakes": "Fehler",
     "theme_title": "Zwischen hellem und dunklem Design wechseln",
     "language": "Sprache",
-    "footer": "Daten: Zomato-Restaurants (Kaggle). Alles auf dieser Seite wird live aus PostgreSQL gelesen.",
+    "footer": "Daten: Zomato-Restaurants (Kaggle). Die Ergebnisse werden live aus PostgreSQL gelesen; die Vorhersage-Seite nutzt zusätzlich die gespeicherten Modelle.",
     "error_title": "Fehler",
     # words used in several pages
     "yes": "Ja",
@@ -396,7 +396,7 @@ TEXTS["ar"] = {
     "nav_mistakes": "الأخطاء",
     "theme_title": "التبديل بين المظهر الفاتح والداكن",
     "language": "اللغة",
-    "footer": "البيانات: مطاعم زوماتو (Kaggle). كل ما في هذا الموقع يُقرأ مباشرة من PostgreSQL.",
+    "footer": "البيانات: Zomato Restaurants (Kaggle). تُقرأ النتائج مباشرة من PostgreSQL، وتستخدم صفحة التنبؤ أيضًا النماذج المحفوظة.",
     "error_title": "خطأ",
     # words used in several pages
     "yes": "نعم",
@@ -520,7 +520,7 @@ TEXTS["zh"] = {
     "nav_mistakes": "错误",
     "theme_title": "切换浅色和深色主题",
     "language": "语言",
-    "footer": "数据：Zomato 餐厅（Kaggle）。本站所有内容均实时读取自 PostgreSQL。",
+    "footer": "数据：Zomato Restaurants (Kaggle)。结果实时读取自 PostgreSQL；预测页面还会使用已保存的模型.",
     "error_title": "错误",
     # words used in several pages
     "yes": "是",
